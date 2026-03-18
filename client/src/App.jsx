@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AppLayout } from "@/components/layout";
 import useAuth from "@/hooks/useAuth";
 import useToast from "@/hooks/useToast";
 import { ToastContainer } from "@/components/ui";
@@ -16,31 +17,33 @@ import Profile from "@/pages/Profile";
 import NotFound from "@/pages/NotFound";
 
 const App = () => {
-  const { isLoading } = useAuth();
+  // const { isLoading } = useAuth();
   const { toasts, removeToast } = useToast();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // if (isLoading) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center bg-gray-50">
+  //       <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+  //     </div>
+  //   );
+  // }
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public routes */}
+        {/* Public routes — no layout */}
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
 
-        {/* Protected routes */}
+        {/* Protected routes — wrapped in AppLayout */}
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <AppLayout>
+                <Dashboard />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -48,7 +51,9 @@ const App = () => {
           path="/decoder"
           element={
             <ProtectedRoute>
-              <Decoder />
+              <AppLayout>
+                <Decoder />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -56,7 +61,9 @@ const App = () => {
           path="/cv"
           element={
             <ProtectedRoute>
-              <CVManager />
+              <AppLayout>
+                <CVManager />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -64,7 +71,9 @@ const App = () => {
           path="/cv/:versionId"
           element={
             <ProtectedRoute>
-              <CVEditor />
+              <AppLayout>
+                <CVEditor />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -72,7 +81,9 @@ const App = () => {
           path="/cover-letter"
           element={
             <ProtectedRoute>
-              <CoverLetter />
+              <AppLayout>
+                <CoverLetter />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -80,7 +91,9 @@ const App = () => {
           path="/profile"
           element={
             <ProtectedRoute>
-              <Profile />
+              <AppLayout>
+                <Profile />
+              </AppLayout>
             </ProtectedRoute>
           }
         />
@@ -89,7 +102,6 @@ const App = () => {
         <Route path="*" element={<NotFound />} />
       </Routes>
 
-      {/* Global toast notifications */}
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </BrowserRouter>
   );

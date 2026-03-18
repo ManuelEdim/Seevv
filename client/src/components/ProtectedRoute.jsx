@@ -2,10 +2,9 @@ import { Navigate } from "react-router-dom";
 import { useAuthStore } from "@/store";
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuthStore((state) => ({
-    isAuthenticated: state.isAuthenticated,
-    isLoading: state.isLoading,
-  }));
+  // Select each value separately — never pass an inline object to Zustand
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isLoading = useAuthStore((state) => state.isLoading);
 
   if (isLoading) {
     return (
