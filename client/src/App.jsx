@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import useAuth from "@/hooks/useAuth";
+import useToast from "@/hooks/useToast";
+import { ToastContainer } from "@/components/ui";
 
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
@@ -14,11 +16,9 @@ import Profile from "@/pages/Profile";
 import NotFound from "@/pages/NotFound";
 
 const App = () => {
-  // Initialises auth listener and keeps Zustand store in sync
   const { isLoading } = useAuth();
+  const { toasts, removeToast } = useToast();
 
-  // Show nothing while checking for existing session
-  // prevents flash of login screen for already-authenticated users
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -88,6 +88,9 @@ const App = () => {
         {/* 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+
+      {/* Global toast notifications */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </BrowserRouter>
   );
 };
