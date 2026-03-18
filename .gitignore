@@ -39,3 +39,19 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+
+
+# Environment files — all variations, belt and braces
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+client/.env.local
+server/.env
+
+# Keep the examples — they're safe to commit
+!.env.example
+!client/.env.example
+!server/.env.example
