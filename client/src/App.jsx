@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import useAuth from "@/hooks/useAuth";
 
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
@@ -13,6 +14,19 @@ import Profile from "@/pages/Profile";
 import NotFound from "@/pages/NotFound";
 
 const App = () => {
+  // Initialises auth listener and keeps Zustand store in sync
+  const { isLoading } = useAuth();
+
+  // Show nothing while checking for existing session
+  // prevents flash of login screen for already-authenticated users
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
