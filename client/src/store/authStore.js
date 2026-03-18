@@ -8,7 +8,7 @@ const useAuthStore = create(
         // State
         user: null,
         session: null,
-        isAuthenticated: true,
+        isAuthenticated: false,
         isLoading: false,
         error: null,
 
