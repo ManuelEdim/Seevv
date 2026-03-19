@@ -14,7 +14,6 @@ const useDashboard = () => {
   });
   const [jobTargets, setJobTargets] = useState([]);
 
-  // Define function first with useCallback — then useEffect can safely call it
   const fetchDashboardData = useCallback(async () => {
     if (!user) return;
 
@@ -22,7 +21,6 @@ const useDashboard = () => {
     setError(null);
 
     try {
-      // Fetch job targets
       const { data: jobs, error: jobsError } = await supabase
         .from("job_targets")
         .select("*")
@@ -31,7 +29,6 @@ const useDashboard = () => {
 
       if (jobsError) throw jobsError;
 
-      // Fetch CV versions count
       const { count: cvCount, error: cvError } = await supabase
         .from("cv_versions")
         .select("*", { count: "exact", head: true })
@@ -39,7 +36,6 @@ const useDashboard = () => {
 
       if (cvError) throw cvError;
 
-      // Calculate metrics
       const applied =
         jobs?.filter((j) =>
           ["applied", "interview", "offer"].includes(j.status),
@@ -73,6 +69,24 @@ const useDashboard = () => {
     }
   }, [user]);
 
+  // Optimistically add a job to the list immediately
+  // without waiting for a database round trip
+  const addJobOptimistically = useCallback(
+    (jobData) => {
+      const optimisticJob = {
+        id: `temp-${Date.now()}`, // temporary ID until DB confirms
+        user_id: user?.id,
+        status: "saved",
+        match_score: 0,
+        created_at: new Date().toISOString(),
+        ...jobData,
+      };
+
+      setJobTargets((prev) => [optimisticJob, ...prev]);
+    },
+    [user],
+  );
+
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
@@ -82,6 +96,8 @@ const useDashboard = () => {
     error,
     metrics,
     jobTargets,
+    refetch: fetchDashboardData,
+    addJobOptimistically,
   };
 };
 

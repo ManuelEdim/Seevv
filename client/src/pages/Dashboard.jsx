@@ -39,7 +39,14 @@ const Dashboard = () => {
   const user = useAuthStore((state) => state.user);
   const [isAddJobOpen, setIsAddJobOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
-  const { isLoading, error, metrics, jobTargets, refetch } = useDashboard();
+  const {
+    isLoading,
+    error,
+    metrics,
+    jobTargets,
+    refetch,
+    addJobOptimistically,
+  } = useDashboard();
 
   const fullName = user?.user_metadata?.full_name || "";
 
@@ -202,6 +209,7 @@ const Dashboard = () => {
         isOpen={isAddJobOpen}
         onClose={() => setIsAddJobOpen(false)}
         onSuccess={refetch}
+        onOptimisticAdd={addJobOptimistically}
       />
     </div>
   );

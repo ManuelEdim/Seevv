@@ -8,7 +8,6 @@ const Modal = ({
   size = "md",
   showClose = true,
 }) => {
-  // Close on Escape key
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === "Escape") onClose();
@@ -25,6 +24,8 @@ const Modal = ({
     };
   }, [isOpen, onClose]);
 
+  // Don't unmount — use visibility so form state is preserved
+  // when user switches tabs or accidentally closes
   if (!isOpen) return null;
 
   const sizes = {
@@ -62,7 +63,7 @@ const Modal = ({
               {showClose && (
                 <button
                   onClick={onClose}
-                  className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                  className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   ✕
                 </button>
