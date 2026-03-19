@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,6 +6,7 @@ import { z } from "zod";
 import { signUp, signInWithGoogle } from "@/lib/auth";
 import { Button, Input } from "@/components/ui";
 import { useToast } from "@/context/ToastContext";
+import { useAuthStore } from "@/store";
 
 const signupSchema = z
   .object({
@@ -33,10 +34,18 @@ const signupSchema = z
   });
 
 const Signup = () => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const navigate = useNavigate();
   const [authError, setAuthError] = useState(null);
   const [googleLoading, setGoogleLoading] = useState(false);
   const { toast } = useToast();
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   // NOTE: success state and "Check your email" screen removed
   // Email confirmation is disabled in Supabase for development

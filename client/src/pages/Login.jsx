@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,6 +6,7 @@ import { z } from "zod";
 import { signIn, signInWithGoogle } from "@/lib/auth";
 import { Button, Input } from "@/components/ui";
 import { useToast } from "@/context/ToastContext";
+import { useAuthStore } from "@/store";
 
 const loginSchema = z.object({
   email: z
@@ -19,10 +20,18 @@ const loginSchema = z.object({
 });
 
 const Login = () => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const navigate = useNavigate();
   const { toast } = useToast();
   const [authError, setAuthError] = useState(null);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const {
     register,
@@ -168,7 +177,6 @@ const Login = () => {
               error={errors.email?.message}
               {...register("email")}
             />
-
             <div>
               <Input
                 label="Password"
@@ -186,7 +194,6 @@ const Login = () => {
                 </Link>
               </div>
             </div>
-
             <Button
               type="submit"
               variant="primary"
