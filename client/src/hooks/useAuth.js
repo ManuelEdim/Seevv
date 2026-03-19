@@ -6,13 +6,13 @@ const useAuth = () => {
   const { login, logout, setLoading } = useAuthStore();
 
   useEffect(() => {
-    // Check for existing session on app load
     const initAuth = async () => {
       setLoading(true);
       try {
         const {
           data: { session },
         } = await supabase.auth.getSession();
+
         if (session) {
           login(session.user, session);
         }
@@ -25,12 +25,12 @@ const useAuth = () => {
 
     initAuth();
 
-    // Listen for auth state changes
-    // This fires on: sign in, sign out, token refresh
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session) {
+      console.log("Auth event:", event, session?.user?.email);
+
+      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
         login(session.user, session);
       } else if (event === "SIGNED_OUT") {
         logout();
@@ -39,7 +39,6 @@ const useAuth = () => {
       }
     });
 
-    // Cleanup listener when component unmounts
     return () => subscription.unsubscribe();
   }, [login, logout, setLoading]);
 
