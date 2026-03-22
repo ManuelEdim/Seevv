@@ -22,7 +22,7 @@ const CVManager = () => {
   const [showUploader, setShowUploader] = useState(false);
   const [deletingVersionId, setDeletingVersionId] = useState(null);
 
-  const handleUploadSuccess = (cvRecord) => {
+  const handleUploadSuccess = () => {
     setShowUploader(false);
     refetch();
     toast.success("CV uploaded! You can now create tailored versions.");
@@ -80,23 +80,25 @@ const CVManager = () => {
   }
 
   return (
-    <div className=" space-y-6">
-      {/* Master CV section */}
+    <div className="max-w-3xl mx-auto space-y-6 pb-10">
+      {/* ── Master CV section ─────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <div>
+        {/* Section header */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold text-gray-900">Master CV</h2>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
               Your base CV — all tailored versions are created from this
             </p>
           </div>
-          {masterCV && (
+          {masterCV && !showUploader && (
             <Button
               variant="outline"
               size="sm"
+              className="flex-shrink-0"
               onClick={() => setShowUploader(true)}
             >
-              Replace CV
+              Replace
             </Button>
           )}
         </div>
@@ -119,11 +121,13 @@ const CVManager = () => {
         {/* Current master CV card */}
         {masterCV && !showUploader && (
           <Card padding="md">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-brand-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            {/* File info row */}
+            <div className="flex items-start gap-3">
+              {/* Icon */}
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-50 rounded-xl flex items-center justify-center flex-shrink-0">
                 <svg
-                  width="22"
-                  height="22"
+                  width="20"
+                  height="20"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="#534AB7"
@@ -137,11 +141,14 @@ const CVManager = () => {
                   <line x1="16" y1="17" x2="8" y2="17" />
                 </svg>
               </div>
+
+              {/* File details */}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">
+                <p className="text-sm font-semibold text-gray-900 truncate pr-2">
                   {masterCV.file_name}
                 </p>
-                <div className="flex items-center gap-2 mt-1">
+                {/* Badges — wrap on mobile */}
+                <div className="flex items-center flex-wrap gap-2 mt-1">
                   <Badge variant="success" size="sm">
                     Active
                   </Badge>
@@ -149,7 +156,6 @@ const CVManager = () => {
                     {masterCV.file_type}
                   </span>
                   <span className="text-xs text-gray-400">
-                    Uploaded{" "}
                     {new Date(masterCV.created_at).toLocaleDateString("en-GB", {
                       day: "numeric",
                       month: "short",
@@ -158,19 +164,22 @@ const CVManager = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Delete — top right on mobile */}
               <button
                 onClick={handleDeleteMasterCV}
-                className="text-xs text-gray-400 hover:text-coral-600 cursor-pointer transition-colors flex-shrink-0"
+                className="text-xs text-gray-400 hover:text-coral-600 cursor-pointer transition-colors flex-shrink-0 mt-0.5"
               >
                 Delete
               </button>
             </div>
 
-            {/* Quick actions */}
-            <div className="flex gap-3 mt-4 pt-4 border-t border-gray-50">
+            {/* Quick actions — stack on very small screens */}
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 pt-4 border-t border-gray-50">
               <Button
                 variant="primary"
                 size="sm"
+                fullWidth
                 onClick={() => navigate("/decoder")}
               >
                 Decode a job
@@ -178,6 +187,7 @@ const CVManager = () => {
               <Button
                 variant="secondary"
                 size="sm"
+                fullWidth
                 onClick={() => navigate("/dashboard")}
               >
                 View job targets
@@ -187,10 +197,11 @@ const CVManager = () => {
         )}
       </div>
 
-      {/* Tailored versions section */}
+      {/* ── Tailored versions section ─────────────────── */}
       <div>
-        <div className="flex items-center w-fullc justify-between mb-3">
-          <div>
+        {/* Section header */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold text-gray-900">
               Tailored versions
               {cvVersions.length > 0 && (
@@ -199,42 +210,45 @@ const CVManager = () => {
                 </span>
               )}
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
               Each version is tailored for a specific role
             </p>
           </div>
         </div>
 
+        {/* Empty state */}
         {cvVersions.length === 0 ? (
-          <EmptyState
-            icon={
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#534AB7"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="12" y1="18" x2="12" y2="12" />
-                <line x1="9" y1="15" x2="15" y2="15" />
-              </svg>
-            }
-            title="No tailored versions yet"
-            description={
-              masterCV
-                ? "Add a job target on the dashboard, decode it, then tailor your CV for it."
-                : "Upload your master CV first, then add job targets to start tailoring."
-            }
-            action={() =>
-              masterCV ? navigate("/dashboard") : setShowUploader(true)
-            }
-            actionLabel={masterCV ? "Go to dashboard" : "Upload CV"}
-          />
+          <Card padding="none">
+            <EmptyState
+              icon={
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#534AB7"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="12" y1="18" x2="12" y2="12" />
+                  <line x1="9" y1="15" x2="15" y2="15" />
+                </svg>
+              }
+              title="No tailored versions yet"
+              description={
+                masterCV
+                  ? "Add a job target on the dashboard, decode it, then tailor your CV for it."
+                  : "Upload your master CV first, then add job targets to start tailoring."
+              }
+              action={() =>
+                masterCV ? navigate("/dashboard") : setShowUploader(true)
+              }
+              actionLabel={masterCV ? "Go to dashboard" : "Upload CV"}
+            />
+          </Card>
         ) : (
           <div className="grid gap-3">
             {cvVersions.map((version) => (

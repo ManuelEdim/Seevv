@@ -137,11 +137,11 @@ const Sidebar = ({ isOpen, onClose }) => {
       `}
     >
       {/* Brand + close button */}
-      <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="h-16 px-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
         <img
           src="/logo.png"
           alt="Seevv"
-          className="h-30 w-full object-cover cursor-pointer"
+          className="sm:h-38 h-30 w-full object-contain cursor-pointer"
         />
         {/* Close button — mobile only */}
         <button
