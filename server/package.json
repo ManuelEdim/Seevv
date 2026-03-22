@@ -14,8 +14,10 @@
     "dotenv": "latest",
     "express": "latest",
     "helmet": "latest",
+    "mammoth": "^1.12.0",
     "morgan": "latest",
     "multer": "^2.1.1",
+    "pdf-parse": "^2.4.5",
     "uuid": "latest"
   },
   "devDependencies": {
