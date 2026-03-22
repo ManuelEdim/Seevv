@@ -189,7 +189,7 @@ const CVManager = () => {
 
       {/* Tailored versions section */}
       <div>
-        <div className="flex items-center w-full justify-between mb-3">
+        <div className="flex items-center w-fullc justify-between mb-3">
           <div>
             <h2 className="text-sm font-semibold text-gray-900">
               Tailored versions
