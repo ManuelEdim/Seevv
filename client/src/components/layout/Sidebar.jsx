@@ -141,7 +141,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         <img
           src="/logo.png"
           alt="Seevv"
-          className="h-30 w-full object-contain"
+          className="h-30 w-full object-cover cursor-pointer"
         />
         {/* Close button — mobile only */}
         <button

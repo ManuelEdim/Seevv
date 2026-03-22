@@ -100,7 +100,7 @@ const CoverLetter = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
+    <div className="mx-auto space-y-5">
       {/* Job selector — shown if not coming from a specific job */}
       {!jobId && (
         <Card padding="md">
