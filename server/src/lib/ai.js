@@ -21,7 +21,7 @@ const generateContent = async (prompt, modelTier = "flash", options = {}) => {
     model: modelName,
     generationConfig: {
       temperature: options.temperature ?? 0.7,
-      maxOutputTokens: options.maxTokens ?? 2048,
+      maxOutputTokens: options.maxTokens ?? 4096,
       responseMimeType: options.json ? "application/json" : "text/plain",
     },
   });
@@ -36,7 +36,24 @@ const generateContent = async (prompt, modelTier = "flash", options = {}) => {
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")
         .trim();
-      return JSON.parse(cleaned);
+
+      // Attempt to fix truncated JSON by closing open brackets
+      let jsonStr = cleaned;
+      if (!jsonStr.endsWith("}")) {
+        // Count open vs closed braces and add missing closing braces
+        const opens = (jsonStr.match(/{/g) || []).length;
+        const closes = (jsonStr.match(/}/g) || []).length;
+        const missing = opens - closes;
+        // Close any open arrays first
+        if (jsonStr.lastIndexOf("[") > jsonStr.lastIndexOf("]")) {
+          jsonStr += "]";
+        }
+        for (let i = 0; i < missing; i++) {
+          jsonStr += "}";
+        }
+      }
+
+      return JSON.parse(jsonStr);
     } catch (err) {
       throw new Error(`AI returned invalid JSON: ${text.slice(0, 200)}`);
     }
@@ -82,7 +99,11 @@ Rules:
 Job description:
 ${jobDescription}`;
 
-  return generateContent(prompt, "pro", { json: true, temperature: 0.3 });
+  return generateContent(prompt, "pro", {
+    json: true,
+    temperature: 0.3,
+    maxTokens: 8192,
+  });
 };
 
 // Extract ATS keywords only — fast and cheap
