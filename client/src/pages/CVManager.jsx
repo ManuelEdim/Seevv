@@ -80,7 +80,7 @@ const CVManager = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-10">
+    <div className=" mx-auto space-y-6 pb-10">
       {/* ── Master CV section ─────────────────────────── */}
       <div>
         {/* Section header */}

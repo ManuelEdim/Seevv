@@ -5,12 +5,74 @@ import { useAuthStore } from "@/store";
 import { Button, Spinner } from "@/components/ui";
 import { useToast } from "@/context/ToastContext";
 import { supabase } from "@/lib/supabase";
+import * as mammoth from "mammoth";
+import * as pdfjsLib from "pdfjs-dist";
+
+// Point to the PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.mjs",
+  import.meta.url,
+).toString();
+
+// Extract text from PDF using PDF.js
+const extractPDFText = async (arrayBuffer) => {
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let fullText = "";
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item) => item.str).join(" ");
+    fullText += pageText + "\n";
+  }
+  return fullText;
+};
+
+// Extract text from DOCX using mammoth
+const extractDOCXText = async (arrayBuffer) => {
+  const result = await mammoth.extractRawText({ arrayBuffer });
+  return result.value;
+};
+
+// Extract text from TXT
+const extractTXTText = async (arrayBuffer) => {
+  return new TextDecoder("utf-8").decode(arrayBuffer);
+};
+
+// Clean extracted text
+const cleanText = (text) => {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+};
+
+// Extract CV text from file based on type
+const extractTextFromFile = async (file) => {
+  const arrayBuffer = await file.arrayBuffer();
+  const ext = file.name.split(".").pop().toLowerCase();
+
+  let text = "";
+  if (ext === "pdf") {
+    text = await extractPDFText(arrayBuffer);
+  } else if (ext === "docx" || ext === "doc") {
+    text = await extractDOCXText(arrayBuffer);
+  } else if (ext === "txt") {
+    text = await extractTXTText(arrayBuffer);
+  } else {
+    throw new Error("Unsupported file type. Please upload PDF, DOCX, or TXT.");
+  }
+
+  return cleanText(text);
+};
 
 const CVUploader = ({ onUploadSuccess }) => {
   const user = useAuthStore((state) => state.user);
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [stage, setStage] = useState("idle"); // idle | uploading | parsing | done
 
   const onDrop = useCallback(
     async (acceptedFiles) => {
@@ -19,25 +81,38 @@ const CVUploader = ({ onUploadSuccess }) => {
 
       setIsUploading(true);
       setUploadProgress(0);
+      setStage("uploading");
 
       try {
-        // Simulate progress
+        // Stage 1 — Upload to Supabase Storage
         const progressInterval = setInterval(() => {
           setUploadProgress((prev) => {
-            if (prev >= 85) {
+            if (prev >= 75) {
               clearInterval(progressInterval);
-              return 85;
+              return 75;
             }
             return prev + 15;
           });
         }, 200);
 
-        // Upload to Supabase Storage
         const uploadData = await uploadCV(file, user.id);
         clearInterval(progressInterval);
-        setUploadProgress(100);
+        setUploadProgress(80);
 
-        // Save CV record to database
+        // Stage 2 — Parse text client-side
+        setStage("parsing");
+        let rawText = "";
+        try {
+          rawText = await extractTextFromFile(file);
+          console.log("Extracted text length:", rawText.length);
+        } catch (parseError) {
+          console.warn("Text extraction failed:", parseError.message);
+          // Non-blocking — continue without raw text
+        }
+
+        setUploadProgress(90);
+
+        // Stage 3 — Save CV record with raw text
         const { data: cvRecord, error } = await supabase
           .from("cvs")
           .insert({
@@ -46,19 +121,26 @@ const CVUploader = ({ onUploadSuccess }) => {
             file_url: uploadData.path,
             file_type: file.name.split(".").pop().toLowerCase(),
             is_active: true,
+            raw_text: rawText || null,
           })
           .select()
           .single();
 
         if (error) throw error;
 
-        toast.success("CV uploaded successfully! Ready to tailor.");
+        setUploadProgress(100);
+        setStage("done");
+
+        console.log("CV saved with raw_text length:", rawText.length);
+        toast.success("CV uploaded and parsed! Ready to tailor.");
         onUploadSuccess(cvRecord);
       } catch (error) {
+        console.error("Upload error:", error);
         toast.error(error.message || "Upload failed. Please try again.");
       } finally {
         setIsUploading(false);
         setUploadProgress(0);
+        setStage("idle");
       }
     },
     [user.id, toast, onUploadSuccess],
@@ -74,9 +156,15 @@ const CVUploader = ({ onUploadSuccess }) => {
         "text/plain": [".txt"],
       },
       maxFiles: 1,
-      maxSize: 5 * 1024 * 1024, // 5MB
+      maxSize: 5 * 1024 * 1024,
       disabled: isUploading,
     });
+
+  const stageLabel = {
+    uploading: "Uploading your CV...",
+    parsing: "Reading and parsing CV...",
+    done: "Done!",
+  };
 
   return (
     <div>
@@ -97,7 +185,7 @@ const CVUploader = ({ onUploadSuccess }) => {
           <div className="flex flex-col items-center gap-3">
             <Spinner size="lg" />
             <p className="text-sm font-medium text-gray-700">
-              Uploading your CV...
+              {stageLabel[stage] || "Processing..."}
             </p>
             <div className="w-full max-w-xs bg-gray-100 rounded-full h-1.5">
               <div
