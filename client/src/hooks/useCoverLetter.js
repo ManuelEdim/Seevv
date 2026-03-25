@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store";
+import api from "@/lib/api";
 
 const useCoverLetter = () => {
   const user = useAuthStore((state) => state.user);
@@ -105,33 +106,30 @@ const useCoverLetter = () => {
       setError(null);
 
       try {
-        // Placeholder — real AI generation in Phase 4
-        await new Promise((resolve) => setTimeout(resolve, 2500));
+        // Real AI call to backend
+        const response = await api.post("/cover-letter/generate", {
+          jobTargetId: targetJobId,
+          tone: selectedTone || tone,
+        });
 
-        const jobForLetter = jobs.find((j) => j.id === targetJobId) || job;
-
-        const mockContent = `Dear Hiring Manager,
-
-I am writing to express my strong interest in the ${jobForLetter?.job_title || "position"} role at ${jobForLetter?.company_name || "your company"}. With my background in delivering high-impact work and a track record of taking ownership in fast-paced environments, I am confident I can make an immediate and meaningful contribution to your team.
-
-Throughout my career, I have consistently demonstrated the ability to move quickly without sacrificing quality. I thrive in environments where autonomy is valued and where the work I do has a direct impact on outcomes. The opportunity at ${jobForLetter?.company_name || "your company"} appeals to me precisely because of the ownership-driven culture and the scale of the challenges ahead.
-
-What excites me most about this role is the intersection of strategic thinking and hands-on execution. I have spent years building the kind of deep expertise that allows me to operate at both levels — contributing individual work while also shaping how the broader team approaches problems.
-
-I would welcome the opportunity to discuss how my experience aligns with what you are looking for. I am available at your convenience and look forward to the conversation.
-
-Yours sincerely,`;
-
-        setContent(mockContent);
-        setWordCount(mockContent.split(/\s+/).filter(Boolean).length);
+        const generatedContent = response.content;
+        setContent(generatedContent);
+        setWordCount(
+          response.word_count ||
+            generatedContent.split(/\s+/).filter(Boolean).length,
+        );
         setHasUnsavedChanges(true);
       } catch (err) {
-        setError(err.message);
+        setError(
+          err.response?.data?.error ||
+            err.message ||
+            "Failed to generate cover letter. Please try again.",
+        );
       } finally {
         setIsGenerating(false);
       }
     },
-    [job, jobs],
+    [tone],
   );
 
   const saveCoverLetter = useCallback(

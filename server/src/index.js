@@ -10,6 +10,7 @@ import authRouter from "./routes/auth.js";
 import cvRouter from "./routes/cv.js";
 import jobsRouter from "./routes/jobs.js";
 import decoderRouter from "./routes/decoder.js";
+import coverLetterRouter from "./routes/coverLetter.js";
 
 // Middleware
 import errorHandler from "./middleware/errorHandler.js";
@@ -48,6 +49,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/cv", cvRouter);
 app.use("/api/jobs", jobsRouter);
 app.use("/api/decoder", decoderRouter);
+app.use("/api/cover-letter", coverLetterRouter);
 
 // ─── 404 handler ───────────────────────────
 app.use((req, res) => {
