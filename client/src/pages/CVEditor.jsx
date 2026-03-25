@@ -1,41 +1,54 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Badge, Spinner, Card } from "@/components/ui";
 import useCVEditor from "@/hooks/useCVEditor";
 import { useToast } from "@/context/ToastContext";
 
-// ─── Bullet item with accept/reject ──────────────────────
+// ─── Rewrite level config ─────────────────────────────────
 
-const BulletItem = ({
+const rewriteLabelConfig = {
+  none: {
+    label: "Strong match — kept as is",
+    color: "text-teal-600 bg-teal-50 border-teal-100",
+  },
+  bullet: {
+    label: "Bullets refined",
+    color: "text-amber-700 bg-amber-50 border-amber-100",
+  },
+  full: {
+    label: "Fully rewritten",
+    color: "text-brand-700 bg-brand-50 border-brand-100",
+  },
+};
+
+// ─── Single bullet with accept / reject ──────────────────
+
+const BulletRow = ({
   original,
   tailored,
+  accepted,
   onAccept,
   onReject,
-  accepted,
-  rewriteLevel,
   autoAccepted,
 }) => {
   const [showOriginal, setShowOriginal] = useState(false);
-  const noChange = original === tailored || rewriteLevel === "none";
+  const unchanged = original === tailored;
 
-  if (autoAccepted && noChange) {
+  if (autoAccepted && unchanged) {
     return (
-      <div className="rounded-lg border border-teal-100 bg-teal-50 p-3">
-        <p className="text-sm text-gray-800 leading-relaxed">{tailored}</p>
-        <span className="mt-1.5 inline-block text-xs text-teal-600 font-medium">
-          ✓ Strong match — kept as is
-        </span>
-      </div>
+      <li className="text-sm text-gray-700 leading-relaxed py-0.5">
+        {tailored}
+      </li>
     );
   }
 
   return (
-    <div
-      className={`rounded-lg border p-3 transition-all duration-150 ${
+    <li
+      className={`rounded-lg border px-3 py-2 mb-1.5 transition-all duration-150 list-none ${
         accepted === true
-          ? "border-teal-400 bg-teal-50"
+          ? "border-teal-200 bg-teal-50"
           : accepted === false
-            ? "border-gray-200 bg-gray-50 opacity-60"
+            ? "border-gray-200 bg-gray-50 opacity-50"
             : "border-brand-200 bg-brand-50"
       }`}
     >
@@ -47,46 +60,46 @@ const BulletItem = ({
         {tailored}
       </p>
 
-      {original && original !== tailored && (
+      {!unchanged && (
         <button
           onClick={() => setShowOriginal((p) => !p)}
-          className="mt-1.5 text-xs text-gray-400 hover:text-gray-600 cursor-pointer"
+          className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer mt-1"
         >
           {showOriginal ? "Hide original" : "Show original"}
         </button>
       )}
 
       {showOriginal && (
-        <p className="mt-2 text-xs text-gray-400 italic border-t border-gray-200 pt-2">
+        <p className="mt-1.5 text-xs text-gray-400 italic border-t border-gray-200 pt-1.5">
           Original: {original}
         </p>
       )}
 
-      {accepted === undefined && (
+      {accepted === undefined && !autoAccepted && (
         <div className="flex gap-2 mt-2">
           <button
             onClick={onAccept}
-            className="text-xs px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 cursor-pointer transition-colors"
+            className="text-xs px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 cursor-pointer"
           >
             ✓ Accept
           </button>
           <button
             onClick={onReject}
-            className="text-xs px-2.5 py-1 rounded-full bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 cursor-pointer transition-colors"
+            className="text-xs px-2.5 py-1 rounded-full bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 cursor-pointer"
           >
             ✗ Reject
           </button>
         </div>
       )}
 
-      {accepted === true && (
-        <span className="mt-2 inline-block text-xs text-teal-600 font-medium">
+      {accepted === true && !autoAccepted && (
+        <span className="mt-1 inline-block text-xs text-teal-600 font-medium">
           ✓ Accepted
         </span>
       )}
 
       {accepted === false && (
-        <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center gap-2 mt-1">
           <span className="text-xs text-gray-400">
             Rejected — original will be used
           </span>
@@ -98,264 +111,248 @@ const BulletItem = ({
           </button>
         </div>
       )}
-    </div>
+    </li>
   );
 };
 
-// ─── Section panel ────────────────────────────────────────
+// ─── Experience role block ────────────────────────────────
 
-const rewriteLabelConfig = {
-  none: { label: "No changes needed", color: "text-teal-600" },
-  bullet: { label: "Bullets refined", color: "text-amber-600" },
-  full: { label: "Fully rewritten", color: "text-brand-600" },
-};
+const RoleBlock = ({ role, jobDescription }) => {
+  const bullets = role.bullets || [];
+  const bulletsOriginal = role.bullets_original || bullets;
+  const autoAccepted = role.rewrite_level === "none";
 
-const CVSection = ({ title, bullets, rewriteLevel }) => {
   const [bulletStates, setBulletStates] = useState(
-    bullets.map((b) => (b.autoAccepted ? true : undefined)),
+    bullets.map(() => (autoAccepted ? true : undefined)),
   );
 
-  const handleAccept = (i) => {
-    setBulletStates((prev) => {
-      const next = [...prev];
-      next[i] = true;
-      return next;
-    });
-  };
-
-  const handleReject = (i) => {
-    setBulletStates((prev) => {
-      const next = [...prev];
-      next[i] = false;
-      return next;
-    });
-  };
-
-  const acceptedCount = bulletStates.filter((s) => s === true).length;
   const pendingCount = bulletStates.filter((s) => s === undefined).length;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-card overflow-hidden">
-      {/* Section header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50 bg-gray-50">
-        <div className="flex items-center gap-2">
-          <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
-            {title}
-          </h3>
-          {rewriteLevel && rewriteLabelConfig[rewriteLevel] && (
-            <span
-              className={`text-xs ${rewriteLabelConfig[rewriteLevel].color}`}
-            >
-              · {rewriteLabelConfig[rewriteLevel].label}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {pendingCount > 0 && (
-            <span className="text-xs text-amber-600">
-              {pendingCount} pending
-            </span>
-          )}
-          {acceptedCount > 0 && (
-            <span className="text-xs text-teal-600">
-              {acceptedCount} accepted
-            </span>
-          )}
-          {pendingCount > 0 && (
-            <button
-              onClick={() => setBulletStates(bullets.map(() => true))}
-              className="text-xs text-brand-600 hover:text-brand-800 cursor-pointer font-medium"
-            >
-              Accept all
-            </button>
-          )}
-        </div>
+    <div className="mb-5">
+      {/* Role title */}
+      <div className="flex items-start justify-between gap-2 mb-0.5">
+        <p className="text-sm font-semibold text-gray-900">{role.title}</p>
+        {pendingCount > 0 && (
+          <button
+            onClick={() => setBulletStates(bullets.map(() => true))}
+            className="text-xs text-brand-600 hover:text-brand-800 cursor-pointer font-medium flex-shrink-0"
+          >
+            Accept all
+          </button>
+        )}
       </div>
 
+      {/* Company + period */}
+      {role.company && (
+        <p className="text-xs text-gray-500 mb-2">{role.company}</p>
+      )}
+
       {/* Bullets */}
-      <div className="p-4 space-y-3">
+      <ul className="space-y-1 pl-0">
         {bullets.map((bullet, i) => (
-          <BulletItem
+          <BulletRow
             key={i}
-            original={bullet.original}
-            tailored={bullet.tailored}
+            original={bulletsOriginal[i] || bullet}
+            tailored={bullet}
             accepted={bulletStates[i]}
-            rewriteLevel={bullet.rewriteLevel}
-            autoAccepted={bullet.autoAccepted}
-            onAccept={() => handleAccept(i)}
-            onReject={() => handleReject(i)}
+            autoAccepted={autoAccepted}
+            onAccept={() =>
+              setBulletStates((prev) => {
+                const next = [...prev];
+                next[i] = true;
+                return next;
+              })
+            }
+            onReject={() =>
+              setBulletStates((prev) => {
+                const next = [...prev];
+                next[i] = false;
+                return next;
+              })
+            }
           />
         ))}
-      </div>
+      </ul>
     </div>
   );
 };
 
-// ─── Mock content for placeholder display ────────────────
+// ─── Generic section (summary, skills etc) ────────────────
 
-const getMockSections = (jobTitle) => [
-  {
-    title: "Professional summary",
-    rewriteLevel: "full",
-    bullets: [
-      {
-        original: "Experienced product designer with 7 years in the field.",
-        tailored: `Product designer with 7 years shaping digital products from 0→1 and at scale. Led end-to-end design across ${jobTitle || "complex product areas"} — driving decisions that reduced drop-off by 34%. High craft bar; comfortable in ambiguity.`,
-        autoAccepted: false,
-        rewriteLevel: "full",
-      },
-    ],
-  },
-  {
-    title: "Work experience",
-    rewriteLevel: "bullet",
-    bullets: [
-      {
-        original: "Responsible for design of the main product.",
-        tailored:
-          "Owned end-to-end design of the core product — from research to shipped features — resulting in a 28% improvement in task completion rate.",
-        autoAccepted: false,
-        rewriteLevel: "bullet",
-      },
-      {
-        original: "Worked with engineers and product managers.",
-        tailored:
-          "Partnered directly with engineering and PM to define scope, resolve design ambiguity, and ship features on a 2-week sprint cadence.",
-        autoAccepted: false,
-        rewriteLevel: "bullet",
-      },
-      {
-        original: "Created design system components.",
-        tailored:
-          "Led the evolution of the component library from 40 to 180+ components, reducing design-to-dev handoff time by 60%.",
-        autoAccepted: false,
-        rewriteLevel: "bullet",
-      },
-    ],
-  },
-  {
-    title: "Skills",
-    rewriteLevel: "none",
-    bullets: [
-      {
-        original: "Figma, Sketch, user research",
-        tailored:
-          "Figma (expert), user research, prototyping, design systems, cross-functional collaboration, data-informed design",
-        autoAccepted: true,
-        rewriteLevel: "none",
-      },
-    ],
-  },
-];
+const GenericSection = ({ sectionKey, label, section }) => {
+  const autoAccepted = section.accepted === true;
+  const rewriteLevel = section.rewrite_level || "full";
 
-// ─── Extract real sections from AI-generated tailored content ──
-
-const getRealSections = (tailoredContent) => {
-  if (!tailoredContent) return [];
-  const sections = [];
-
-  const sectionConfig = {
-    summary: "Professional summary",
-    experience: "Work experience",
-    skills: "Skills",
-    achievements: "Achievements",
-    projects: "Projects",
-  };
-
-  for (const [key, label] of Object.entries(sectionConfig)) {
-    const section = tailoredContent[key];
-
-    // Skip if section doesn't exist or has no content at all
-    if (!section) continue;
-    if (typeof section !== "object") continue;
-
-    const rewriteLevel = section.rewrite_level || "full";
-    const autoAccepted = section.accepted === true;
-
-    // Get the tailored text — try multiple possible fields
-    const tailoredText = section.tailored || section.text || "";
-    const originalText = section.original || section.text || tailoredText;
-
-    if (!tailoredText || tailoredText.trim().length < 10) continue;
-
-    // Try bullet-level data first
+  const bullets = (() => {
     const hasBullets =
       Array.isArray(section.bullets_tailored) &&
       section.bullets_tailored.length > 0 &&
-      section.bullets_tailored.some((b) => b && b.trim().length > 5);
+      section.bullets_tailored.every((b) => b && b.trim().length > 35);
 
-    if (hasBullets) {
-      const bullets = section.bullets_tailored
-        .filter((b) => b && b.trim().length > 5)
-        .map((tailored, i) => ({
-          original: section.bullets_original?.[i] || tailored,
-          tailored: tailored.trim(),
-          autoAccepted,
-          rewriteLevel,
-        }));
+    if (hasBullets) return section.bullets_tailored;
 
-      if (bullets.length > 0) {
-        sections.push({ title: label, bullets, rewriteLevel });
-      }
-      continue;
-    }
+    const tailored = section.tailored || section.text || "";
+    return tailored
+      .split(/\n|(?<=[.!?])\s+(?=[A-Z])/)
+      .map((l) => l.replace(/^[-•·▪▸►*○✓\d+.)\s]+/, "").trim())
+      .filter((l) => l.length > 35);
+  })();
 
-    // Fall back to splitting full text into lines
-    const tailoredLines = tailoredText
-      .split("\n")
-      .map((l) => l.replace(/^[-•·▪►*]\s*/, "").trim())
-      .filter((l) => l.length > 15);
+  const bulletsOriginal = (() => {
+    if (
+      Array.isArray(section.bullets_original) &&
+      section.bullets_original.length > 0
+    )
+      return section.bullets_original;
 
-    const originalLines = originalText
-      .split("\n")
-      .map((l) => l.replace(/^[-•·▪►*]\s*/, "").trim())
-      .filter((l) => l.length > 15);
+    const original = section.original || section.text || "";
+    return original
+      .split(/\n|(?<=[.!?])\s+(?=[A-Z])/)
+      .map((l) => l.replace(/^[-•·▪▸►*○✓\d+.)\s]+/, "").trim())
+      .filter((l) => l.length > 35);
+  })();
 
-    if (tailoredLines.length === 0) {
-      // Last resort — treat the whole section as a single bullet
-      sections.push({
-        title: label,
-        rewriteLevel,
-        bullets: [
-          {
-            original: originalText.trim(),
-            tailored: tailoredText.trim(),
-            autoAccepted,
-            rewriteLevel,
-          },
-        ],
-      });
-      continue;
-    }
+  const [bulletStates, setBulletStates] = useState(
+    bullets.map(() => (autoAccepted ? true : undefined)),
+  );
 
-    sections.push({
-      title: label,
-      rewriteLevel,
-      bullets: tailoredLines.map((tailored, i) => ({
-        original: originalLines[i] || tailored,
-        tailored,
-        autoAccepted,
-        rewriteLevel,
-      })),
-    });
-  }
+  const pendingCount = bulletStates.filter((s) => s === undefined).length;
 
-  return sections;
+  if (bullets.length === 0) return null;
+
+  return (
+    <div className="mb-5">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest">
+            {label}
+          </h3>
+          {rewriteLabelConfig[rewriteLevel] && (
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full border ${rewriteLabelConfig[rewriteLevel].color}`}
+            >
+              {rewriteLabelConfig[rewriteLevel].label}
+            </span>
+          )}
+        </div>
+        {pendingCount > 0 && (
+          <button
+            onClick={() => setBulletStates(bullets.map(() => true))}
+            className="text-xs text-brand-600 hover:text-brand-800 cursor-pointer font-medium"
+          >
+            Accept all
+          </button>
+        )}
+      </div>
+      <div className="h-px bg-gray-200 mb-3" />
+
+      <ul className="space-y-1 pl-0">
+        {bullets.map((bullet, i) => (
+          <BulletRow
+            key={i}
+            original={bulletsOriginal[i] || bullet}
+            tailored={bullet}
+            accepted={bulletStates[i]}
+            autoAccepted={autoAccepted}
+            onAccept={() =>
+              setBulletStates((prev) => {
+                const next = [...prev];
+                next[i] = true;
+                return next;
+              })
+            }
+            onReject={() =>
+              setBulletStates((prev) => {
+                const next = [...prev];
+                next[i] = false;
+                return next;
+              })
+            }
+          />
+        ))}
+      </ul>
+    </div>
+  );
 };
 
-// ─── ATS Preview panel ────────────────────────────────────
+// ─── Experience section ───────────────────────────────────
 
-const ATSPreview = ({ version, sections }) => {
-  // Build ATS text from real sections if available
-  const previewText =
-    sections.length > 0
-      ? sections
-          .map((s) => {
-            const bullets = s.bullets.map((b) => `• ${b.tailored}`).join("\n");
-            return `${s.title.toUpperCase()}\n${"-".repeat(40)}\n${bullets}`;
-          })
-          .join("\n\n")
-      : `PROFESSIONAL SUMMARY\n${"-".repeat(40)}\nProduct designer with 7 years experience.\n\nWORK EXPERIENCE\n${"-".repeat(40)}\n• Owned end-to-end design of core product\n\nSKILLS\n${"-".repeat(40)}\nFigma, User Research, Prototyping`;
+const ExperienceSection = ({ section }) => {
+  const rewriteLevel = section.rewrite_level || "full";
+  const roles = section.roles_tailored || section.roles_original || [];
+
+  if (roles.length === 0) {
+    return (
+      <GenericSection
+        sectionKey="experience"
+        label="Experience"
+        section={section}
+      />
+    );
+  }
+
+  return (
+    <div className="mb-5">
+      <div className="flex items-center gap-2 mb-2">
+        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest">
+          Experience
+        </h3>
+        {rewriteLabelConfig[rewriteLevel] && (
+          <span
+            className={`text-xs px-2 py-0.5 rounded-full border ${rewriteLabelConfig[rewriteLevel].color}`}
+          >
+            {rewriteLabelConfig[rewriteLevel].label}
+          </span>
+        )}
+      </div>
+      <div className="h-px bg-gray-200 mb-3" />
+      {roles.map((role, i) => (
+        <RoleBlock key={i} role={role} />
+      ))}
+    </div>
+  );
+};
+
+// ─── ATS Preview ──────────────────────────────────────────
+
+const ATSPreview = ({ version, tailoredContent }) => {
+  const lines = [];
+
+  if (tailoredContent?.summary?.tailored) {
+    lines.push(`SUMMARY\n${"─".repeat(40)}`);
+    lines.push(tailoredContent.summary.tailored.slice(0, 400));
+    lines.push("");
+  }
+
+  if (tailoredContent?.experience) {
+    lines.push(`EXPERIENCE\n${"─".repeat(40)}`);
+    const roles =
+      tailoredContent.experience.roles_tailored ||
+      tailoredContent.experience.roles_original ||
+      [];
+
+    if (roles.length > 0) {
+      roles.forEach((role) => {
+        lines.push(`${role.title}`);
+        if (role.company) lines.push(role.company);
+        role.bullets.forEach((b) => lines.push(`  • ${b}`));
+        lines.push("");
+      });
+    } else {
+      const bullets = tailoredContent.experience.bullets_tailored || [];
+      bullets.forEach((b) => lines.push(`  • ${b}`));
+      lines.push("");
+    }
+  }
+
+  if (tailoredContent?.skills?.tailored) {
+    lines.push(`SKILLS\n${"─".repeat(40)}`);
+    const skillBullets = tailoredContent.skills.bullets_tailored || [
+      tailoredContent.skills.tailored,
+    ];
+    skillBullets.forEach((b) => lines.push(`  • ${b}`));
+  }
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-card p-5">
@@ -365,14 +362,14 @@ const ATSPreview = ({ version, sections }) => {
           Score: {version?.ats_score || 0}/100
         </Badge>
       </div>
-      <div className="font-mono text-xs text-gray-600 bg-gray-50 rounded-lg p-4 leading-relaxed whitespace-pre-wrap">
-        {previewText}
+      <div className="font-mono text-xs text-gray-600 bg-gray-50 rounded-lg p-4 leading-relaxed whitespace-pre-wrap max-h-[500px] overflow-y-auto">
+        {lines.join("\n") || "No content to preview yet."}
       </div>
     </div>
   );
 };
 
-// ─── Main CVEditor page ───────────────────────────────────
+// ─── Main CV Editor ───────────────────────────────────────
 
 const CVEditor = () => {
   const navigate = useNavigate();
@@ -398,13 +395,6 @@ const CVEditor = () => {
       toast.error(err.message || "Failed to save.");
     }
   };
-
-  const sections = useMemo(() => {
-    if (version?.tailored_content && Object.keys(version.tailored_content).length > 0) {
-      return getRealSections(version.tailored_content);
-    }
-    return getMockSections(job?.job_title);
-  }, [version, job]);
 
   if (isLoading) {
     return (
@@ -436,19 +426,22 @@ const CVEditor = () => {
     );
   }
 
+  const tc = version.tailored_content || {};
+  const hasContent = Object.keys(tc).some(
+    (k) => !["match_score", "blind_spots", "tone", "contact_info"].includes(k),
+  );
+
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
+    <div className="max-w-4xl mx-auto space-y-4 pb-10">
       {/* ── Header ───────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <button
-              onClick={() => navigate("/cv")}
-              className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer"
-            >
-              ← My CVs
-            </button>
-          </div>
+          <button
+            onClick={() => navigate("/cv")}
+            className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer mb-1"
+          >
+            ← My CVs
+          </button>
           <h2 className="text-base font-semibold text-gray-900">
             {version.version_name}
           </h2>
@@ -458,7 +451,7 @@ const CVEditor = () => {
             </p>
           )}
           {version.match_score > 0 && (
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
               <div className="flex items-center gap-1.5 bg-teal-50 border border-teal-100 rounded-full px-3 py-1">
                 <div className="w-2 h-2 rounded-full bg-teal-500" />
                 <span className="text-xs font-semibold text-teal-800">
@@ -475,7 +468,6 @@ const CVEditor = () => {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Tone selector */}
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
             {["conservative", "balanced", "bold"].map((t) => (
               <button
@@ -533,38 +525,107 @@ const CVEditor = () => {
         ))}
       </div>
 
-      {/* ── Editor panel ──────────────────────────────── */}
+      {/* ── Editor ───────────────────────────────────── */}
       {activePanel === "editor" && (
         <div className="space-y-4">
           {/* Info banner */}
           <div className="bg-brand-50 border border-brand-100 rounded-xl px-4 py-3">
             <p className="text-xs text-brand-800">
-              <span className="font-semibold">Review each rewrite below.</span>{" "}
-              Sections with a strong match were kept as-is. Others were
+              <span className="font-semibold">
+                Your CV, section by section.
+              </span>{" "}
+              Sections with a strong match are kept as-is (green). Others are
               rewritten bullet by bullet or fully. Accept what sounds right,
               reject what doesn't — rejected bullets revert to your original.
             </p>
           </div>
 
-          {sections.length === 0 ? (
+          {!hasContent ? (
             <Card padding="md">
-              <p className="text-sm text-gray-500 text-center py-4">
+              <p className="text-sm text-gray-500 text-center py-6">
                 No sections found. Try re-running the tailor from the decoder.
               </p>
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    navigate(`/decoder?jobId=${version.job_target_id}`)
+                  }
+                >
+                  Go to decoder
+                </Button>
+              </div>
             </Card>
           ) : (
-            sections.map((section) => (
-              <CVSection
-                key={section.title}
-                title={section.title}
-                bullets={section.bullets}
-                rewriteLevel={section.rewriteLevel}
-              />
-            ))
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-6 lg:p-8">
+              {/* ── CV Header (name + contact) ─────────── */}
+              {tc.contact_info && tc.contact_info.length > 0 && (
+                <div className="text-center mb-6 pb-6 border-b border-gray-100">
+                  <p className="text-xs text-gray-400 italic">
+                    Contact info from your original CV
+                  </p>
+                </div>
+              )}
+
+              {/* ── Summary ───────────────────────────── */}
+              {tc.summary && (
+                <GenericSection
+                  sectionKey="summary"
+                  label="Summary"
+                  section={tc.summary}
+                />
+              )}
+
+              {/* ── Experience ────────────────────────── */}
+              {tc.experience && <ExperienceSection section={tc.experience} />}
+
+              {/* ── Skills ────────────────────────────── */}
+              {tc.skills && (
+                <GenericSection
+                  sectionKey="skills"
+                  label="Core Skills & Technologies"
+                  section={tc.skills}
+                />
+              )}
+
+              {/* ── Achievements ──────────────────────── */}
+              {tc.achievements && (
+                <GenericSection
+                  sectionKey="achievements"
+                  label="Achievements"
+                  section={tc.achievements}
+                />
+              )}
+
+              {/* ── Projects ──────────────────────────── */}
+              {tc.projects && (
+                <GenericSection
+                  sectionKey="projects"
+                  label="Projects"
+                  section={tc.projects}
+                />
+              )}
+
+              {/* ── Education (always kept) ───────────── */}
+              {tc.education && (
+                <div className="mb-5">
+                  <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-2">
+                    Education
+                  </h3>
+                  <div className="h-px bg-gray-200 mb-3" />
+                  <p className="text-xs text-gray-500 italic mb-2">
+                    ✓ Education kept from your original CV
+                  </p>
+                  <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                    {tc.education.original}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Bottom actions */}
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3">
             <Button
               variant="primary"
               fullWidth
@@ -584,9 +645,9 @@ const CVEditor = () => {
         </div>
       )}
 
-      {/* ── ATS preview panel ─────────────────────────── */}
+      {/* ── ATS Preview ──────────────────────────────── */}
       {activePanel === "ats" && (
-        <ATSPreview version={version} sections={sections} />
+        <ATSPreview version={version} tailoredContent={tc} />
       )}
     </div>
   );

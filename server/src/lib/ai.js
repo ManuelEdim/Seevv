@@ -110,7 +110,7 @@ Job description: ${jobDescription}`;
   return generateContent(prompt, "flash", { json: true, temperature: 0.1 });
 };
 
-// ─── Rewrite a CV bullet point ────────────────────────────
+// ─── Rewrite a CV bullet point (legacy) ──────────────────
 
 export const rewriteBullet = async (
   original,
@@ -124,21 +124,20 @@ export const rewriteBullet = async (
   const prompt = `You are an expert CV writer. Rewrite this CV bullet point to be impact-first and tailored to the job.
 
 Original bullet: "${original}"
-
 Target job description context: "${jobDescription.slice(0, 500)}"
-
 ${voiceInstruction}
 
 Rules:
 - Start with a strong action verb
 - Include measurable outcomes where possible (%, numbers, scale)
-- Keep it under 25 words
+- ALWAYS write a complete sentence — never cut off mid-word
+- Keep it under 35 words
 - Sound natural and human, not generic AI
 - Return ONLY the rewritten bullet text, nothing else`;
 
   return generateContent(prompt, "pro", {
     temperature: 0.6,
-    maxTokens: 100,
+    maxTokens: 300,
   });
 };
 
@@ -153,23 +152,88 @@ export const rewriteSingleBullet = async (
 
   const voiceInstruction = voiceSample
     ? `Match this writing voice: "${voiceSample.slice(0, 200)}"`
-    : "Use professional, confident, first-person implied tone.";
+    : "Use professional, confident, past-tense tone.";
 
-  const prompt = `Rewrite this CV bullet point to be impact-first and tailored to the job.
+  const prompt = `Rewrite this CV bullet point. Return ONLY the complete rewritten bullet — nothing else.
 
 Original: "${bullet.trim()}"
-Job context: "${jobDescription.slice(0, 300)}"
+Job context: "${jobDescription.slice(0, 400)}"
 ${voiceInstruction}
 
 Rules:
-- Start with a strong action verb
-- Add measurable outcomes where logical (%, numbers, scale)
-- Keep under 30 words
-- Sound human, not generic AI
-- If already strong and relevant, improve minimally
-- Return ONLY the rewritten bullet, nothing else`;
+- Complete grammatically correct sentence, never cut off mid-word or mid-phrase
+- Start with a strong past-tense action verb
+- Add measurable outcomes where logical
+- Between 15 and 40 words
+- Sound human, not generic AI`;
 
-  return generateContent(prompt, "pro", { temperature: 0.5, maxTokens: 80 });
+  return generateContent(prompt, "pro", {
+    temperature: 0.5,
+    maxTokens: 300,
+  });
+};
+
+// ─── Rewrite all bullets for a section in one batch ───────
+// Much more reliable than rewriting one at a time with low token limits
+
+export const rewriteBulletsInBatch = async (
+  bullets,
+  sectionType,
+  jobDescription,
+  voiceSample = null,
+) => {
+  if (!bullets || bullets.length === 0) return bullets;
+
+  const voiceInstruction = voiceSample
+    ? `Match this writing voice exactly: "${voiceSample.slice(0, 250)}"`
+    : "Use professional, confident, past-tense tone.";
+
+  const bulletList = bullets.map((b, i) => `${i + 1}. ${b.trim()}`).join("\n");
+
+  const prompt = `You are an expert CV writer. Rewrite these ${sectionType} bullet points to be impact-first and tailored to the job description.
+
+ORIGINAL BULLETS:
+${bulletList}
+
+JOB DESCRIPTION CONTEXT:
+${jobDescription.slice(0, 600)}
+
+${voiceInstruction}
+
+RULES:
+- Rewrite EVERY bullet — return exactly ${bullets.length} bullets
+- Each bullet MUST be a complete grammatically correct sentence — never cut off mid-word
+- Start each with a strong past-tense action verb
+- Add measurable outcomes where logical (%, numbers, scale)
+- Keep each bullet between 15 and 40 words
+- Sound human and specific, not generic AI
+- Preserve all factual details — never fabricate
+
+Return ONLY a numbered list in exactly this format with no extra text:
+1. [rewritten bullet]
+2. [rewritten bullet]
+(continue for all ${bullets.length} bullets)`;
+
+  const result = await generateContent(prompt, "pro", {
+    temperature: 0.6,
+    maxTokens: 2000,
+  });
+
+  // Parse the numbered list back into an array
+  const lines = result
+    .split("\n")
+    .map((l) => l.replace(/^\d+\.\s*/, "").trim())
+    .filter((l) => l.length > 20);
+
+  // If we got back roughly the right number, use them
+  if (lines.length >= Math.ceil(bullets.length * 0.7)) {
+    return lines.slice(0, bullets.length);
+  }
+
+  console.warn(
+    `Batch rewrite returned ${lines.length} bullets, expected ${bullets.length} — using originals`,
+  );
+  return bullets;
 };
 
 // ─── Rewrite an entire CV section ─────────────────────────
@@ -200,7 +264,10 @@ Rules:
 - Sound like a human wrote it, not AI
 - Return the rewritten section as plain text only`;
 
-  return generateContent(prompt, "pro", { temperature: 0.6 });
+  return generateContent(prompt, "pro", {
+    temperature: 0.6,
+    maxTokens: 2000,
+  });
 };
 
 // ─── Calculate match score ────────────────────────────────
@@ -337,6 +404,7 @@ export default {
   extractKeywords,
   rewriteBullet,
   rewriteSingleBullet,
+  rewriteBulletsInBatch,
   rewriteCVSection,
   calculateMatchScore,
   generateCoverLetter,

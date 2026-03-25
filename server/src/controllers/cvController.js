@@ -1,6 +1,6 @@
 import { parseCV, extractCVSections, cleanText } from "../lib/cvParser.js";
 import {
-  rewriteSingleBullet,
+  rewriteBulletsInBatch,
   rewriteCVSection,
   calculateMatchScore,
   detectBlindSpots,
@@ -51,34 +51,32 @@ export const parseCVController = async (req, res) => {
 };
 
 // ─── Bullet extractor ─────────────────────────────────────
-// Handles both structured text (real line breaks) and flat
-// PDF.js output (entire page as one long string)
 
 const extractBulletsFromText = (text, max = 10) => {
   const cleaned = text.trim();
 
-  // Strategy 1 — newline-based (clean structured text)
+  // Strategy 1 — newline-based
   const byLines = cleaned
     .split("\n")
     .map((l) => l.replace(/^[-•·▪▸►*○✓\d+.)\s]+/, "").trim())
-    .filter((l) => l.length > 30 && l.length < 600);
+    .filter((l) => l.length > 35 && l.length < 600);
   if (byLines.length >= 2) return byLines.slice(0, max);
 
   // Strategy 2 — inline bullet markers
   const byMarkers = cleaned
     .split(/\s*[•·▪▸►○✓]\s*/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 30 && s.length < 600);
+    .filter((s) => s.length > 35 && s.length < 600);
   if (byMarkers.length >= 2) return byMarkers.slice(0, max);
 
-  // Strategy 3 — numbered list markers like "1. " "2. " "○ "
-  const byNumbered = cleaned
-    .split(/(?:\d+\.\s+|○\s+)/)
+  // Strategy 3 — circle bullets (○) specifically
+  const byCircle = cleaned
+    .split(/○\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 30 && s.length < 600);
-  if (byNumbered.length >= 2) return byNumbered.slice(0, max);
+    .filter((s) => s.length > 35 && s.length < 600);
+  if (byCircle.length >= 2) return byCircle.slice(0, max);
 
-  // Strategy 4 — sentence boundaries (full sentences only)
+  // Strategy 4 — sentence boundaries
   const bySentences = cleaned
     .split(/(?<=[.!?])\s+(?=[A-Z][a-z])/)
     .map((s) => s.trim())
@@ -86,17 +84,112 @@ const extractBulletsFromText = (text, max = 10) => {
   if (bySentences.length >= 2) return bySentences.slice(0, max);
 
   // Strategy 5 — split on action verbs ONLY after sentence-ending punctuation
-  // This prevents cutting mid-phrase like "Architected and..."
   const byVerbs = cleaned
     .split(
-      /(?<=[.!?])\s+(?=(?:Built|Led|Developed|Created|Managed|Designed|Implemented|Delivered|Architected|Improved|Increased|Reduced|Launched|Drove|Established|Collaborated|Mentored|Migrated|Optimised|Optimized|Spearheaded|Engineered|Enhanced|Streamlined|Directed|Oversaw|Produced|Authored|Coordinated|Facilitated)\s)/i,
+      /(?<=[.!?])\s+(?=(?:Built|Led|Developed|Created|Managed|Designed|Implemented|Delivered|Architected|Improved|Increased|Reduced|Launched|Drove|Established|Collaborated|Mentored|Migrated|Optimised|Optimized|Spearheaded|Engineered|Enhanced|Streamlined|Directed|Oversaw|Produced|Authored|Coordinated|Facilitated|Supported|Assisted|Contributed|Modernized|Modernised)\s)/i,
     )
     .map((s) => s.trim())
     .filter((s) => s.length > 40 && s.length < 600);
   if (byVerbs.length >= 2) return byVerbs.slice(0, max);
 
-  // Fallback — return whole text as single block for AI to handle
+  // Fallback — whole text as single block
   return cleaned.length > 30 ? [cleaned.slice(0, 800)] : [];
+};
+
+// ─── Parse experience into structured roles ───────────────
+
+const parseExperienceSection = (text) => {
+  if (!text) return [];
+
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const roles = [];
+  let currentRole = null;
+  let currentBullets = [];
+
+  const isRoleTitle = (line) => {
+    // Matches patterns like "Lead Frontend Developer – RemoteHealth"
+    // or "Frontend Developer" followed by company on next line
+    const titlePatterns = [/^.{5,60}(?:\s*[-–—]\s*.{3,})?$/];
+    const bulletPatterns = /^[-•·▪▸►*○✓]|^\d+\./;
+    const isShort = line.length < 80;
+    const isNotBullet = !bulletPatterns.test(line);
+    const hasCapital = /^[A-Z]/.test(line);
+    const looksLikeTitle =
+      /developer|engineer|designer|manager|director|intern|consultant|analyst|architect|lead|senior|junior|frontend|backend|fullstack|full-stack/i.test(
+        line,
+      );
+
+    return isShort && isNotBullet && hasCapital && looksLikeTitle;
+  };
+
+  const isCompanyLine = (line) => {
+    return (
+      line.length < 80 &&
+      /\d{4}|present|current|freelance|contract|remote|ltd|inc|llc|solutions|company/i.test(
+        line,
+      )
+    );
+  };
+
+  const isBullet = (line) => {
+    return (
+      /^[-•·▪▸►*○✓]/.test(line) ||
+      /^\d+\./.test(line) ||
+      (line.length > 30 &&
+        /^(?:Built|Led|Developed|Created|Managed|Designed|Implemented|Delivered|Architected|Improved|Increased|Reduced|Launched|Drove|Established|Collaborated|Mentored|Migrated|Optimised|Optimized|Spearheaded|Engineered|Enhanced|Streamlined|Directed|Oversaw|Produced|Authored|Coordinated|Facilitated|Supported|Assisted|Contributed|Modernized|Modernised)\s/i.test(
+          line,
+        ))
+    );
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (isRoleTitle(line)) {
+      // Save previous role
+      if (currentRole && currentBullets.length > 0) {
+        roles.push({ ...currentRole, bullets: currentBullets });
+      }
+      currentRole = { title: line, company: "", period: "" };
+      currentBullets = [];
+
+      // Check if next line is company/date
+      if (i + 1 < lines.length && isCompanyLine(lines[i + 1])) {
+        currentRole.company = lines[i + 1];
+        i++;
+      }
+    } else if (isBullet(line) && currentRole) {
+      const cleaned = line
+        .replace(/^[-•·▪▸►*○✓]\s*/, "")
+        .replace(/^\d+\.\s*/, "")
+        .trim();
+      if (cleaned.length > 20) {
+        currentBullets.push(cleaned);
+      }
+    }
+  }
+
+  // Save last role
+  if (currentRole && currentBullets.length > 0) {
+    roles.push({ ...currentRole, bullets: currentBullets });
+  }
+
+  // If no roles found — fall back to flat bullets
+  if (roles.length === 0) {
+    return [
+      {
+        title: "Experience",
+        company: "",
+        period: "",
+        bullets: extractBulletsFromText(text, 10),
+      },
+    ];
+  }
+
+  return roles;
 };
 
 // ─── Smart selective CV rewriter ──────────────────────────
@@ -106,7 +199,6 @@ export const rewriteCVController = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // Get CV
     const { data: cv, error: cvError } = await supabase
       .from("cvs")
       .select("*")
@@ -118,7 +210,6 @@ export const rewriteCVController = async (req, res) => {
       return res.status(404).json({ error: "CV not found." });
     }
 
-    // Get job target
     const { data: job, error: jobError } = await supabase
       .from("job_targets")
       .select("*")
@@ -130,7 +221,6 @@ export const rewriteCVController = async (req, res) => {
       return res.status(404).json({ error: "Job target not found." });
     }
 
-    // Get voice sample
     const { data: profile } = await supabase
       .from("profiles")
       .select("voice_sample")
@@ -155,7 +245,6 @@ export const rewriteCVController = async (req, res) => {
       sections = extractCVSections(rawText);
     }
 
-    // Check for meaningful sections
     const processableSectionKeys = [
       "summary",
       "experience",
@@ -163,17 +252,18 @@ export const rewriteCVController = async (req, res) => {
       "achievements",
       "projects",
     ];
+
     const meaningfulSections = processableSectionKeys.filter(
       (k) => (sections[k]?.text?.trim().length ?? 0) > 20,
     );
     console.log("Meaningful sections:", meaningfulSections);
     console.log("Raw text length:", rawText.length);
 
-    // If section extraction failed — use regex-based fallback
+    // Regex fallback if extraction failed
     if (meaningfulSections.length === 0) {
       console.warn("Section extraction failed — using regex fallback");
-
       const text = rawText;
+
       const summaryMatch = text.match(
         /(?:SUMMARY|PROFILE|ABOUT\s+ME|OBJECTIVE)\s*[:\-]?\s*([\s\S]*?)(?=\b(?:EXPERIENCE|EMPLOYMENT|WORK HISTORY|EDUCATION|SKILLS|ACHIEVEMENTS|PROJECTS)\b|$)/i,
       );
@@ -209,34 +299,107 @@ export const rewriteCVController = async (req, res) => {
       );
     }
 
-    // ── Scoring thresholds ────────────────────────────────
-    const REWRITE_THRESHOLD = 75; // Keep original — already strong match
-    const LIGHT_THRESHOLD = 50; // Bullet-by-bullet refinement
-    // Below LIGHT_THRESHOLD → full section rewrite
+    const REWRITE_THRESHOLD = 75;
+    const LIGHT_THRESHOLD = 50;
 
-    // ── Process a single section ──────────────────────────
     const processSection = async (key) => {
       const section = sections[key];
       if (!section?.text || section.text.trim().length < 20) return null;
 
       const sectionText = section.text;
+      const matchScore = await scoreSectionMatch(sectionText, jobDescription);
+      console.log(`Section "${key}" score: ${matchScore}`);
 
-      // Extract bullets — prefer stored, fall back to smart extractor
+      // ── Experience — parse into structured roles ──────
+      if (key === "experience") {
+        const roles = parseExperienceSection(sectionText);
+        console.log(`Experience: ${roles.length} roles found`);
+        roles.forEach((r) =>
+          console.log(`  Role: "${r.title}" | bullets: ${r.bullets.length}`),
+        );
+
+        // High match — keep original
+        if (matchScore >= REWRITE_THRESHOLD) {
+          return [
+            key,
+            {
+              original: sectionText,
+              tailored: sectionText,
+              roles_original: roles,
+              roles_tailored: roles,
+              rewrite_level: "none",
+              match_score: matchScore,
+              accepted: true,
+            },
+          ];
+        }
+
+        // Rewrite each role's bullets as a batch
+        const rewrittenRoles = await Promise.all(
+          roles.map(async (role) => {
+            if (!role.bullets || role.bullets.length === 0) return role;
+            const rewrote = await rewriteBulletsInBatch(
+              role.bullets,
+              `work experience (${role.title})`,
+              jobDescription,
+              voiceSample,
+            );
+            return {
+              ...role,
+              bullets_original: role.bullets,
+              bullets: rewrote,
+            };
+          }),
+        );
+
+        return [
+          key,
+          {
+            original: sectionText,
+            tailored: rewrittenRoles
+              .map((r) => r.bullets.join("\n"))
+              .join("\n\n"),
+            roles_original: roles,
+            roles_tailored: rewrittenRoles,
+            rewrite_level: matchScore >= LIGHT_THRESHOLD ? "bullet" : "full",
+            match_score: matchScore,
+            accepted: null,
+          },
+        ];
+      }
+
+      // ── Other sections ────────────────────────────────
+
+      // Extract bullets with quality check
       const storedBullets = (section.bullets || []).filter(
-        (b) => typeof b === "string" && b.length > 25,
+        (b) => typeof b === "string" && b.trim().length > 35,
       );
-      const extractedBullets =
+
+      let extractedBullets =
         storedBullets.length >= 2
           ? storedBullets.slice(0, 10)
           : extractBulletsFromText(sectionText, 10);
 
-      // Score the section
-      const matchScore = await scoreSectionMatch(sectionText, jobDescription);
+      // If avg bullet length is too short, retry with sentence splitting
+      const avgLength =
+        extractedBullets.reduce((sum, b) => sum + b.length, 0) /
+        (extractedBullets.length || 1);
+
+      if (avgLength < 40 && extractedBullets.length > 0) {
+        const bySentence = sectionText
+          .split(/(?<=[.!?])\s+(?=[A-Z])/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 40 && s.length < 600);
+        if (bySentence.length >= 2) {
+          extractedBullets = bySentence.slice(0, 10);
+        }
+      }
+
       console.log(
-        `Section "${key}" score: ${matchScore} | bullets: ${extractedBullets.length}`,
+        `Section "${key}" | bullets: ${extractedBullets.length} | avg len: ${Math.round(avgLength)}`,
       );
 
-      // ── High match — keep original ────────────────────
+      // High match — keep original
       if (matchScore >= REWRITE_THRESHOLD) {
         return [
           key,
@@ -252,55 +415,41 @@ export const rewriteCVController = async (req, res) => {
         ];
       }
 
-      // ── Medium match — refine bullets ─────────────────
-      if (matchScore >= LIGHT_THRESHOLD) {
-        const rewrittenBullets = await Promise.all(
-          extractedBullets.map((b) =>
-            rewriteSingleBullet(b, jobDescription, voiceSample)
-              .then((r) => r.trim())
-              .catch(() => b),
-          ),
-        );
+      // Use batch rewriting for complete, non-truncated bullets
+      const rewrittenBullets = await rewriteBulletsInBatch(
+        extractedBullets,
+        key,
+        jobDescription,
+        voiceSample,
+      );
 
-        return [
-          key,
-          {
-            original: sectionText,
-            tailored: rewrittenBullets.join("\n"),
-            bullets_original: extractedBullets,
-            bullets_tailored: rewrittenBullets,
-            rewrite_level: "bullet",
-            match_score: matchScore,
-            accepted: null,
-          },
-        ];
+      // Full rewrite for low-match sections
+      let fullRewrite = sectionText;
+      if (matchScore < LIGHT_THRESHOLD) {
+        try {
+          fullRewrite = await rewriteCVSection(
+            key,
+            sectionText.slice(0, 1500),
+            jobDescription,
+            voiceSample,
+          );
+        } catch (e) {
+          console.warn(`Full rewrite failed for ${key}:`, e.message);
+          fullRewrite = rewrittenBullets.join("\n");
+        }
       }
-
-      // ── Low match — full rewrite ───────────────────────
-      const [rewritten, rewrittenBullets] = await Promise.all([
-        rewriteCVSection(
-          key,
-          sectionText.slice(0, 1500),
-          jobDescription,
-          voiceSample,
-        ),
-        Promise.all(
-          extractedBullets.map((b) =>
-            rewriteSingleBullet(b, jobDescription, voiceSample)
-              .then((r) => r.trim())
-              .catch(() => b),
-          ),
-        ),
-      ]);
 
       return [
         key,
         {
           original: sectionText,
-          tailored: rewritten,
+          tailored:
+            matchScore < LIGHT_THRESHOLD
+              ? fullRewrite
+              : rewrittenBullets.join("\n"),
           bullets_original: extractedBullets,
           bullets_tailored: rewrittenBullets,
-          rewrite_level: "full",
+          rewrite_level: matchScore < LIGHT_THRESHOLD ? "full" : "bullet",
           match_score: matchScore,
           accepted: null,
         },
@@ -316,7 +465,7 @@ export const rewriteCVController = async (req, res) => {
       if (result) tailoredContent[result[0]] = result[1];
     }
 
-    // Safety net — if nothing processed, surface raw text
+    // Safety net
     if (Object.keys(tailoredContent).length === 0) {
       console.warn("All sections skipped — forcing from raw text");
       const expText = rawText.slice(0, 3000).trim();
@@ -345,7 +494,7 @@ export const rewriteCVController = async (req, res) => {
       };
     }
 
-    // Calculate overall match score and blind spots in parallel
+    // Calculate overall match score and blind spots
     const [matchScore, blindSpots] = await Promise.all([
       calculateMatchScore(rawText, jobDescription),
       detectBlindSpots(rawText, jobDescription).catch((e) => {
@@ -359,7 +508,6 @@ export const rewriteCVController = async (req, res) => {
     tailoredContent.tone = tone;
     tailoredContent.contact_info = sections.contact_info || [];
 
-    // Create CV version record
     const versionName = `${job.job_title} at ${job.company_name}`;
     const { data: version, error: versionError } = await supabase
       .from("cv_versions")
@@ -379,7 +527,6 @@ export const rewriteCVController = async (req, res) => {
 
     if (versionError) throw versionError;
 
-    // Update job target match score
     await supabase
       .from("job_targets")
       .update({ match_score: matchScore.overall_score || 0 })
