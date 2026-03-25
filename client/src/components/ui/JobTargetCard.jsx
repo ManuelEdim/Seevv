@@ -17,7 +17,7 @@ const priorityConfig = {
   low: { label: "Low", color: "text-gray-400 bg-gray-50" },
 };
 
-const JobTargetCard = ({ job, onStatusChange }) => {
+const JobTargetCard = ({ job, onDelete }) => {
   const navigate = useNavigate();
   const status = statusConfig[job.status] || statusConfig.saved;
   const priority = priorityConfig[job.priority] || priorityConfig.medium;
@@ -99,6 +99,20 @@ const JobTargetCard = ({ job, onStatusChange }) => {
           >
             Decode
           </button>
+          {onDelete && (
+            <>
+              <span className="text-gray-200">·</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(job.id);
+                }}
+                className="text-xs text-red-400 hover:text-red-600 font-medium cursor-pointer transition-colors"
+              >
+                Delete
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -269,12 +269,65 @@ Job description: ${jobDescription.slice(0, 500)}`;
   return generateContent(prompt, "flash", { json: true, temperature: 0.3 });
 };
 
+// Smart section scorer — decides if a section needs rewriting
+export const scoreSectionMatch = async (sectionText, jobDescription) => {
+  if (!sectionText || sectionText.trim().length < 20) return 0;
+
+  const prompt = `Score how well this CV section matches this job description.
+Return ONLY a single integer between 0 and 100. Nothing else.
+
+CV section:
+${sectionText.slice(0, 500)}
+
+Job description:
+${jobDescription.slice(0, 400)}`;
+
+  const result = await generateContent(prompt, "flash", {
+    temperature: 0.1,
+    maxTokens: 10,
+  });
+
+  const score = parseInt(result.trim(), 10);
+  return isNaN(score) ? 50 : Math.min(100, Math.max(0, score));
+};
+
+// Rewrite a single bullet point with context
+export const rewriteSingleBullet = async (
+  bullet,
+  jobDescription,
+  voiceSample = null,
+) => {
+  if (!bullet || bullet.trim().length < 10) return bullet;
+
+  const voiceInstruction = voiceSample
+    ? `Match this writing voice: "${voiceSample.slice(0, 200)}"`
+    : "Use professional, confident, first-person implied tone.";
+
+  const prompt = `Rewrite this CV bullet point to be impact-first and tailored to the job.
+
+Original: "${bullet.trim()}"
+Job context: "${jobDescription.slice(0, 300)}"
+${voiceInstruction}
+
+Rules:
+- Start with a strong action verb
+- Add measurable outcomes where logical (%, numbers, scale)
+- Keep under 30 words
+- Sound human, not generic AI
+- If already strong and relevant, improve minimally
+- Return ONLY the rewritten bullet, nothing else`;
+
+  return generateContent(prompt, "pro", { temperature: 0.5, maxTokens: 80 });
+};
+
 export default {
   analyzeJobDescription,
   extractKeywords,
   rewriteBullet,
+  rewriteSingleBullet,
   rewriteCVSection,
   calculateMatchScore,
   generateCoverLetter,
   detectBlindSpots,
+  scoreSectionMatch,
 };

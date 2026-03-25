@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, Badge, Spinner, Card } from "@/components/ui";
 import useDecoder from "@/hooks/useDecoder";
 
@@ -31,7 +31,6 @@ const signalTypeColors = {
 
 const HiddenNeedTab = ({ result }) => (
   <div className="space-y-4">
-    {/* Main diagnosis */}
     <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-xl p-4">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
@@ -46,7 +45,6 @@ const HiddenNeedTab = ({ result }) => (
       </p>
     </div>
 
-    {/* Culture + Urgency */}
     <div className="grid grid-cols-2 gap-3">
       <div className="bg-white rounded-xl border border-gray-100 p-4">
         <p className="text-xs text-gray-400 mb-1">Culture tone</p>
@@ -64,7 +62,6 @@ const HiddenNeedTab = ({ result }) => (
       </div>
     </div>
 
-    {/* Positioning advice */}
     <div className="bg-brand-50 rounded-xl border border-brand-100 p-4">
       <p className="text-xs font-semibold text-brand-800 uppercase tracking-wide mb-3">
         How to position your CV
@@ -109,7 +106,6 @@ const SignalsTab = ({ result }) => (
 
 const RequirementsTab = ({ result }) => (
   <div className="space-y-2">
-    {/* Summary bar */}
     <div className="flex gap-3 mb-4">
       {["met", "partial", "gap"].map((status) => {
         const count = result.requirements.filter(
@@ -169,7 +165,6 @@ const KeywordsTab = ({ result }) => (
         <p className="text-sm font-medium text-gray-900 flex-1 capitalize">
           {kw.keyword}
         </p>
-        {/* Weight bar */}
         <div className="flex items-center gap-2 w-32">
           <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div
@@ -196,9 +191,11 @@ const tabs = [
 ];
 
 const Decoder = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const jobId = searchParams.get("jobId");
   const [jdText, setJdText] = useState("");
+  const [isTailoring, setIsTailoring] = useState(false);
 
   const {
     job,
@@ -215,6 +212,12 @@ const Decoder = () => {
     const text = job?.job_description || jdText;
     if (!text.trim()) return;
     runDecoder(text, jobId || null);
+  };
+
+  const handleTailorCV = () => {
+    if (!jobId) return;
+    setIsTailoring(true);
+    navigate(`/cv?tailor=${jobId}`);
   };
 
   if (isLoadingJob) {
@@ -318,7 +321,6 @@ const Decoder = () => {
 
           {/* Tabs */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-card overflow-hidden">
-            {/* Tab nav */}
             <div className="flex border-b border-gray-100 overflow-x-auto">
               {tabs.map((tab) => (
                 <button
@@ -335,7 +337,6 @@ const Decoder = () => {
               ))}
             </div>
 
-            {/* Tab content */}
             <div className="p-4 lg:p-5">
               {activeTab === "hidden-need" && (
                 <HiddenNeedTab result={decoderResult} />
@@ -351,20 +352,19 @@ const Decoder = () => {
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <Button
               variant="primary"
               fullWidth
-              onClick={() => (window.location.href = `/cv?jobId=${jobId}`)}
+              isLoading={isTailoring}
+              onClick={handleTailorCV}
             >
               Tailor my CV for this role →
             </Button>
             <Button
               variant="outline"
               fullWidth
-              onClick={() =>
-                (window.location.href = `/cover-letter?jobId=${jobId}`)
-              }
+              onClick={() => navigate(`/cover-letter?jobId=${jobId}`)}
             >
               Generate cover letter
             </Button>

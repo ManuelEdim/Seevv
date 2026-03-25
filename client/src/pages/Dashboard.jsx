@@ -10,6 +10,8 @@ import {
 } from "@/components/ui";
 import AddJobModal from "@/components/AddJobModal";
 import useDashboard from "@/hooks/useDashboard";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/context/ToastContext";
 
 const WelcomeBanner = ({ name, onAddJob }) => (
   <div className="bg-brand-600 rounded-2xl p-5 lg:p-6 text-white mb-6">
@@ -37,6 +39,7 @@ const WelcomeBanner = ({ name, onAddJob }) => (
 const Dashboard = () => {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const { toast } = useToast();
   const [isAddJobOpen, setIsAddJobOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const {
@@ -47,6 +50,21 @@ const Dashboard = () => {
     refetch,
     addJobOptimistically,
   } = useDashboard();
+
+  const handleDeleteJob = async (jobId) => {
+    if (!window.confirm("Delete this role? This cannot be undone.")) return;
+    const { error } = await supabase
+      .from("job_targets")
+      .delete()
+      .eq("id", jobId)
+      .eq("user_id", user.id);
+    if (error) {
+      toast.error("Failed to delete role.");
+    } else {
+      toast.success("Role deleted.");
+      refetch();
+    }
+  };
 
   const fullName = user?.user_metadata?.full_name || "";
 
@@ -198,7 +216,7 @@ const Dashboard = () => {
         ) : (
           <div className="p-3 lg:p-4 grid gap-3">
             {filteredJobs.map((job) => (
-              <JobTargetCard key={job.id} job={job} onStatusChange={refetch} />
+              <JobTargetCard key={job.id} job={job} onDelete={handleDeleteJob} />
             ))}
           </div>
         )}

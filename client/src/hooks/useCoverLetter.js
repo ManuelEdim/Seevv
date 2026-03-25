@@ -100,13 +100,12 @@ const useCoverLetter = () => {
   }, []);
 
   const generateCoverLetter = useCallback(
-    async (targetJobId, selectedTone) => {
+    async (targetJobId, selectedTone, onSuccess) => {
       if (!targetJobId) return;
       setIsGenerating(true);
       setError(null);
 
       try {
-        // Real AI call to backend
         const response = await api.post("/cover-letter/generate", {
           jobTargetId: targetJobId,
           tone: selectedTone || tone,
@@ -119,6 +118,9 @@ const useCoverLetter = () => {
             generatedContent.split(/\s+/).filter(Boolean).length,
         );
         setHasUnsavedChanges(true);
+
+        // Call success callback if provided
+        if (onSuccess) onSuccess();
       } catch (err) {
         setError(
           err.response?.data?.error ||

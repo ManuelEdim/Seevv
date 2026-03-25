@@ -14,15 +14,30 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url,
 ).toString();
 
-// Extract text from PDF using PDF.js
+// Extract text from PDF using PDF.js — preserve line structure
 const extractPDFText = async (arrayBuffer) => {
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   let fullText = "";
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const pageText = content.items.map((item) => item.str).join(" ");
-    fullText += pageText + "\n";
+    // Group items by their Y position to reconstruct lines
+    const lines = [];
+    let currentLine = [];
+    let lastY = null;
+    for (const item of content.items) {
+      const y = item.transform?.[5];
+      if (lastY !== null && Math.abs(y - lastY) > 2) {
+        if (currentLine.length > 0) {
+          lines.push(currentLine.join(" "));
+          currentLine = [];
+        }
+      }
+      if (item.str.trim()) currentLine.push(item.str);
+      lastY = y;
+    }
+    if (currentLine.length > 0) lines.push(currentLine.join(" "));
+    fullText += lines.join("\n") + "\n";
   }
   return fullText;
 };

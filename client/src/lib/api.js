@@ -7,7 +7,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 30000, // 30 seconds — AI calls can take a while
+  timeout: 120000, // 2 minutes — CV rewriting makes multiple AI calls
 });
 
 // ─── Request interceptor ───────────────────────────────

@@ -9,3 +9,4 @@ export { default as Toast, ToastContainer } from "./Toast";
 export { default as MetricCard } from "./MetricCard";
 export { default as JobTargetCard } from "./JobTargetCard";
 export { default as EmptyState } from "./EmptyState";
+export { default as SuccessBanner } from "./SuccessBanner";

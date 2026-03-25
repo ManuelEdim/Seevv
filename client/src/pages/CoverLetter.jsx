@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Button, Badge, Spinner, Card, EmptyState } from "@/components/ui";
 import useCoverLetter from "@/hooks/useCoverLetter";
 import { useToast } from "@/context/ToastContext";
+import { SuccessBanner } from "@/components/ui";
+import useSuccessAnimation from "@/hooks/useSuccessAnimation";
 
 const toneConfig = {
   formal: {
@@ -42,6 +44,11 @@ const CoverLetter = () => {
   const { toast } = useToast();
   const [selectedJobId, setSelectedJobId] = useState("");
   const [isSaved, setIsSaved] = useState(false);
+  const {
+    isAnimating,
+    isVisible,
+    trigger: triggerSuccess,
+  } = useSuccessAnimation(3500);
 
   const {
     job,
@@ -69,11 +76,9 @@ const CoverLetter = () => {
       toast.warning("Please select a job target first.");
       return;
     }
-    // Reset saved state when regenerating
     setIsSaved(false);
-    generateCoverLetter(activeJobId, tone);
+    generateCoverLetter(activeJobId, tone, triggerSuccess);
   };
-
   const handleSave = async () => {
     if (!activeJobId) return;
     try {
@@ -318,6 +323,16 @@ const CoverLetter = () => {
       )}
 
       {/* Editor — shown when content exists, not saved, not generating */}
+      {/* Success banner — slides in after generation */}
+      {content && !isGenerating && !isSaved && (
+        <SuccessBanner
+          isVisible={isVisible}
+          title="Cover letter generated!"
+          description={`${wordCount} words · ${toneConfig[tone]?.label} tone · Ready to review and save`}
+        />
+      )}
+
+      {/* Editor — shown when content exists, not saved, not generating */}
       {content && !isGenerating && !isSaved && (
         <div className="space-y-4">
           {/* Toolbar */}
@@ -352,8 +367,14 @@ const CoverLetter = () => {
             </div>
           </div>
 
-          {/* Editable content */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-card overflow-hidden">
+          {/* Editable content — wobble + shimmer border on success */}
+          <div
+            className={`bg-white rounded-2xl border-2 shadow-card overflow-hidden transition-all duration-300 ${
+              isAnimating
+                ? "animate-wobble animate-shimmer-border"
+                : "border-gray-100"
+            }`}
+          >
             <div className="px-6 py-4 border-b border-gray-50 bg-gray-50 flex items-center justify-between">
               <p className="text-xs font-medium text-gray-500">
                 Cover letter — {job?.job_title || "Role"} at{" "}

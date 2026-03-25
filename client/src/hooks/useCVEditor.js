@@ -14,8 +14,10 @@ const useCVEditor = () => {
   const [error, setError] = useState(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  const userId = user?.id;
+
   const fetchVersion = useCallback(async () => {
-    if (!versionId || !user) return;
+    if (!versionId || !userId) return;
     setIsLoading(true);
     setError(null);
 
@@ -44,7 +46,7 @@ const useCVEditor = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [versionId, user]);
+  }, [versionId, userId]);
 
   useEffect(() => {
     fetchVersion();
@@ -82,7 +84,7 @@ const useCVEditor = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [version, user]);
+  }, [version, userId]);
 
   const updateTone = useCallback((tone) => {
     setVersion((prev) => ({ ...prev, tone }));
