@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button, Badge, Spinner, Card } from "@/components/ui";
 import useCVEditor from "@/hooks/useCVEditor";
 import { useToast } from "@/context/ToastContext";
+import { supabase } from "@/lib/supabase";
 
 // ─── Rewrite level config ─────────────────────────────────
 
@@ -117,7 +118,7 @@ const BulletRow = ({
 
 // ─── Experience role block ────────────────────────────────
 
-const RoleBlock = ({ role, jobDescription }) => {
+const RoleBlock = ({ role }) => {
   const bullets = role.bullets || [];
   const bulletsOriginal = role.bullets_original || bullets;
   const autoAccepted = role.rewrite_level === "none";
@@ -130,7 +131,6 @@ const RoleBlock = ({ role, jobDescription }) => {
 
   return (
     <div className="mb-5">
-      {/* Role title */}
       <div className="flex items-start justify-between gap-2 mb-0.5">
         <p className="text-sm font-semibold text-gray-900">{role.title}</p>
         {pendingCount > 0 && (
@@ -143,12 +143,10 @@ const RoleBlock = ({ role, jobDescription }) => {
         )}
       </div>
 
-      {/* Company + period */}
       {role.company && (
         <p className="text-xs text-gray-500 mb-2">{role.company}</p>
       )}
 
-      {/* Bullets */}
       <ul className="space-y-1 pl-0">
         {bullets.map((bullet, i) => (
           <BulletRow
@@ -336,7 +334,7 @@ const ATSPreview = ({ version, tailoredContent }) => {
       roles.forEach((role) => {
         lines.push(`${role.title}`);
         if (role.company) lines.push(role.company);
-        role.bullets.forEach((b) => lines.push(`  • ${b}`));
+        (role.bullets || []).forEach((b) => lines.push(`  • ${b}`));
         lines.push("");
       });
     } else {
@@ -375,6 +373,7 @@ const CVEditor = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activePanel, setActivePanel] = useState("editor");
+  const [isExporting, setIsExporting] = useState(false);
 
   const {
     version,
@@ -393,6 +392,54 @@ const CVEditor = () => {
       toast.success("CV version saved.");
     } catch (err) {
       toast.error(err.message || "Failed to save.");
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!version?.id) return;
+    setIsExporting(true);
+    toast.info("Generating your PDF — this takes a few seconds...");
+
+    try {
+      // Get current session token
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/export/cv/pdf`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ versionId: version.id }),
+        },
+      );
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Export failed");
+      }
+
+      // Trigger browser download
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${version.version_name || "CV"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("PDF downloaded successfully!");
+    } catch (err) {
+      toast.error(err.message || "Failed to export PDF.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -468,6 +515,7 @@ const CVEditor = () => {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Tone selector */}
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
             {["conservative", "balanced", "bold"].map((t) => (
               <button
@@ -498,7 +546,8 @@ const CVEditor = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => toast.info("PDF export coming in Phase 5")}
+            onClick={handleExportPdf}
+            isLoading={isExporting}
           >
             Export PDF
           </Button>
@@ -558,7 +607,7 @@ const CVEditor = () => {
             </Card>
           ) : (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-6 lg:p-8">
-              {/* ── CV Header (name + contact) ─────────── */}
+              {/* Contact info note */}
               {tc.contact_info && tc.contact_info.length > 0 && (
                 <div className="text-center mb-6 pb-6 border-b border-gray-100">
                   <p className="text-xs text-gray-400 italic">
@@ -567,7 +616,7 @@ const CVEditor = () => {
                 </div>
               )}
 
-              {/* ── Summary ───────────────────────────── */}
+              {/* Summary */}
               {tc.summary && (
                 <GenericSection
                   sectionKey="summary"
@@ -576,10 +625,10 @@ const CVEditor = () => {
                 />
               )}
 
-              {/* ── Experience ────────────────────────── */}
+              {/* Experience */}
               {tc.experience && <ExperienceSection section={tc.experience} />}
 
-              {/* ── Skills ────────────────────────────── */}
+              {/* Skills */}
               {tc.skills && (
                 <GenericSection
                   sectionKey="skills"
@@ -588,7 +637,7 @@ const CVEditor = () => {
                 />
               )}
 
-              {/* ── Achievements ──────────────────────── */}
+              {/* Achievements */}
               {tc.achievements && (
                 <GenericSection
                   sectionKey="achievements"
@@ -597,7 +646,7 @@ const CVEditor = () => {
                 />
               )}
 
-              {/* ── Projects ──────────────────────────── */}
+              {/* Projects */}
               {tc.projects && (
                 <GenericSection
                   sectionKey="projects"
@@ -606,7 +655,7 @@ const CVEditor = () => {
                 />
               )}
 
-              {/* ── Education (always kept) ───────────── */}
+              {/* Education — always kept */}
               {tc.education && (
                 <div className="mb-5">
                   <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-2">
@@ -637,7 +686,8 @@ const CVEditor = () => {
             <Button
               variant="outline"
               fullWidth
-              onClick={() => toast.info("PDF export coming in Phase 5")}
+              onClick={handleExportPdf}
+              isLoading={isExporting}
             >
               Export as PDF
             </Button>
