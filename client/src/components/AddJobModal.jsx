@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store";
 import { Button, Input } from "@/components/ui";
 import { useToast } from "@/context/ToastContext";
+import api from "@/lib/api";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.mjs",
@@ -135,6 +136,7 @@ const AddJobModal = ({
   const [priority, setPriority] = useState(draft.priority || "medium");
   const [jdMode, setJdMode] = useState("paste"); // paste | upload | url
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [fetchUrl, setFetchUrl] = useState("");
 
   const {
@@ -177,6 +179,30 @@ const AddJobModal = ({
     clearDraft();
   };
 
+  // ── Smart fill: parse JD text → populate all form fields ─────────────────
+
+  const smartFillFields = useCallback(
+    async (text) => {
+      setIsParsing(true);
+      try {
+        const fields = await api.post("/jobs/parse-jd", { text });
+        if (fields.jobTitle) setValue("jobTitle", fields.jobTitle, { shouldDirty: true });
+        if (fields.companyName) setValue("companyName", fields.companyName, { shouldDirty: true });
+        if (fields.location) setValue("location", fields.location, { shouldDirty: true });
+        if (fields.salaryRange) setValue("salaryRange", fields.salaryRange, { shouldDirty: true });
+        if (fields.workType && ["remote", "hybrid", "onsite"].includes(fields.workType)) {
+          setWorkType(fields.workType);
+        }
+        toast.success("Fields filled from job description");
+      } catch {
+        // Non-blocking — user can fill manually if AI parse fails
+      } finally {
+        setIsParsing(false);
+      }
+    },
+    [setValue, toast],
+  );
+
   // ── File drop handler ──────────────────────────────────────────────────────
 
   const onDrop = useCallback(
@@ -187,8 +213,9 @@ const AddJobModal = ({
       try {
         const text = await extractTextFromFile(file);
         setValue("jobDescription", text, { shouldValidate: true, shouldDirty: true });
-        setJdMode("paste"); // switch to paste view so user can review/edit
-        toast.success(`Extracted text from ${file.name}`);
+        setJdMode("paste");
+        toast.success(`Text extracted from ${file.name} — filling fields…`);
+        await smartFillFields(text);
       } catch (err) {
         toast.error(err.message || "Could not read the file");
       } finally {
@@ -221,16 +248,11 @@ const AddJobModal = ({
     }
     setIsExtracting(true);
     try {
-      const res = await fetch("/api/jobs/fetch-jd", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: urlToFetch }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to fetch page");
+      const data = await api.post("/jobs/fetch-jd", { url: urlToFetch });
       setValue("jobDescription", data.text, { shouldValidate: true, shouldDirty: true });
       setJdMode("paste");
-      toast.success("Job description extracted from URL");
+      toast.success("Page fetched — filling fields…");
+      await smartFillFields(data.text);
     } catch (err) {
       toast.error(err.message || "Could not fetch the page");
     } finally {
@@ -311,12 +333,25 @@ const AddJobModal = ({
                 </p>
               )}
             </div>
-            <button
-              onClick={handleClose}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
-            >
-              ✕
-            </button>
+            <div className="flex items-center gap-2">
+              {(watchedValues.jobTitle || watchedValues.companyName || watchedValues.jobDescription) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("Clear all fields?")) clearForm();
+                  }}
+                  className="text-xs text-gray-400 hover:text-coral-600 transition-colors cursor-pointer px-2 py-1 rounded hover:bg-gray-50"
+                >
+                  Clear all
+                </button>
+              )}
+              <button
+                onClick={handleClose}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           {/* Body */}
@@ -429,17 +464,44 @@ const AddJobModal = ({
 
                 {/* Paste tab */}
                 {jdMode === "paste" && (
-                  <textarea
-                    placeholder="Paste the full job description here — the more detail, the better the AI analysis..."
-                    rows={6}
-                    className={`
-                      w-full px-3 py-2.5 text-sm rounded-lg border transition-colors resize-none
-                      bg-white text-gray-900 placeholder:text-gray-400
-                      focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent
-                      ${errors.jobDescription ? "border-coral-400" : "border-gray-200 hover:border-gray-300"}
-                    `}
-                    {...register("jobDescription")}
-                  />
+                  <div className="space-y-2">
+                    <textarea
+                      placeholder="Paste the full job description here — the more detail, the better the AI analysis..."
+                      rows={6}
+                      className={`
+                        w-full px-3 py-2.5 text-sm rounded-lg border transition-colors resize-none
+                        bg-white text-gray-900 placeholder:text-gray-400
+                        focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent
+                        ${errors.jobDescription ? "border-coral-400" : "border-gray-200 hover:border-gray-300"}
+                      `}
+                      {...register("jobDescription")}
+                    />
+                    {watchedValues.jobDescription?.length >= 50 && (
+                      <button
+                        type="button"
+                        onClick={() => smartFillFields(watchedValues.jobDescription)}
+                        disabled={isParsing}
+                        className="flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                      >
+                        {isParsing ? (
+                          <>
+                            <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            Filling fields…
+                          </>
+                        ) : (
+                          <>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
+                            </svg>
+                            Auto-fill fields from this description
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 )}
 
                 {/* Upload tab */}
@@ -525,6 +587,16 @@ const AddJobModal = ({
                     <p className="text-xs text-gray-400">
                       Works best with direct job listing pages. If blocked, try uploading or pasting instead.
                     </p>
+                  </div>
+                )}
+
+                {isParsing && jdMode !== "paste" && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-brand-600">
+                    <svg className="animate-spin w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Extracting fields from job description…
                   </div>
                 )}
 

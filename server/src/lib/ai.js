@@ -54,6 +54,35 @@ const generateContent = async (prompt, modelTier = "flash", options = {}) => {
   return text;
 };
 
+// ─── Parse a job description into structured form fields ──
+
+export const parseJobDescription = async (text) => {
+  const prompt = `Extract structured information from this job description and return a JSON object.
+
+Return ONLY this JSON structure, nothing else:
+{
+  "jobTitle": "exact job title from the posting, or null",
+  "companyName": "hiring company name, or null",
+  "location": "city/region/country, or null",
+  "salaryRange": "exact salary text as written (e.g. '£39,424 to £47,779 per annum'), or null",
+  "workType": "remote|hybrid|onsite|null — infer from context if not stated explicitly"
+}
+
+Rules:
+- Return null for any field you cannot confidently determine — never guess
+- jobTitle: use the posted title exactly, not a generic version
+- companyName: the employer, not a recruiter/agency unless that is the employer
+- location: if fully remote with no location stated, set workType to "remote" and location to null
+- salaryRange: copy verbatim from the posting, preserve currency symbols and wording
+- workType: "hybrid" if office days are mentioned, "remote" if fully remote, "onsite" if on-site only
+- Return ONLY valid JSON, no markdown, no explanation
+
+Job description:
+${text.slice(0, 4000)}`;
+
+  return generateContent(prompt, "flash", { json: true, temperature: 0.1 });
+};
+
 // ─── Analyse a job description — Deep Decoder ─────────────
 
 export const analyzeJobDescription = async (jobDescription) => {
@@ -400,6 +429,7 @@ Score (0-100):`;
 };
 
 export default {
+  parseJobDescription,
   analyzeJobDescription,
   extractKeywords,
   rewriteBullet,

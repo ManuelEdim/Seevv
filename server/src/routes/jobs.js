@@ -1,5 +1,6 @@
 import { Router } from "express";
 import authMiddleware from "../middleware/auth.js";
+import { parseJobDescription } from "../lib/ai.js";
 
 const router = Router();
 
@@ -105,6 +106,23 @@ router.post("/fetch-jd", async (req, res) => {
       return res.status(504).json({ error: "The page took too long to respond. Try pasting manually." });
     }
     res.status(502).json({ error: "Failed to fetch the page. Try pasting the job description manually." });
+  }
+});
+
+// POST /api/jobs/parse-jd — extract structured fields from JD text using AI
+router.post("/parse-jd", async (req, res) => {
+  const { text } = req.body;
+
+  if (!text || typeof text !== "string" || text.trim().length < 50) {
+    return res.status(400).json({ error: "Job description text is required (min 50 characters)" });
+  }
+
+  try {
+    const fields = await parseJobDescription(text);
+    res.json(fields);
+  } catch (err) {
+    console.error("parse-jd error:", err.message);
+    res.status(500).json({ error: "Failed to parse job description" });
   }
 });
 
