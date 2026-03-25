@@ -8,7 +8,8 @@ import {
 } from "../lib/ai.js";
 import { supabase } from "../lib/supabase.js";
 
-// Parse an uploaded CV and save the raw text
+// ─── Parse an uploaded CV and save the raw text ───────────
+
 export const parseCVController = async (req, res) => {
   const { cvId } = req.body;
   const userId = req.user.id;
@@ -42,13 +43,64 @@ export const parseCVController = async (req, res) => {
     res.json({ success: true, raw_text: cleanedText, sections });
   } catch (error) {
     console.error("CV parse error:", error);
-    res
-      .status(500)
-      .json({ error: "Failed to parse CV.", details: error.message });
+    res.status(500).json({
+      error: "Failed to parse CV.",
+      details: error.message,
+    });
   }
 };
 
-// Smart selective CV rewriter
+// ─── Bullet extractor ─────────────────────────────────────
+// Handles both structured text (real line breaks) and flat
+// PDF.js output (entire page as one long string)
+
+const extractBulletsFromText = (text, max = 10) => {
+  const cleaned = text.trim();
+
+  // Strategy 1 — newline-based (clean structured text)
+  const byLines = cleaned
+    .split("\n")
+    .map((l) => l.replace(/^[-•·▪▸►*○✓\d+.)\s]+/, "").trim())
+    .filter((l) => l.length > 30 && l.length < 600);
+  if (byLines.length >= 2) return byLines.slice(0, max);
+
+  // Strategy 2 — inline bullet markers
+  const byMarkers = cleaned
+    .split(/\s*[•·▪▸►○✓]\s*/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 30 && s.length < 600);
+  if (byMarkers.length >= 2) return byMarkers.slice(0, max);
+
+  // Strategy 3 — numbered list markers like "1. " "2. " "○ "
+  const byNumbered = cleaned
+    .split(/(?:\d+\.\s+|○\s+)/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 30 && s.length < 600);
+  if (byNumbered.length >= 2) return byNumbered.slice(0, max);
+
+  // Strategy 4 — sentence boundaries (full sentences only)
+  const bySentences = cleaned
+    .split(/(?<=[.!?])\s+(?=[A-Z][a-z])/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 40 && s.length < 600);
+  if (bySentences.length >= 2) return bySentences.slice(0, max);
+
+  // Strategy 5 — split on action verbs ONLY after sentence-ending punctuation
+  // This prevents cutting mid-phrase like "Architected and..."
+  const byVerbs = cleaned
+    .split(
+      /(?<=[.!?])\s+(?=(?:Built|Led|Developed|Created|Managed|Designed|Implemented|Delivered|Architected|Improved|Increased|Reduced|Launched|Drove|Established|Collaborated|Mentored|Migrated|Optimised|Optimized|Spearheaded|Engineered|Enhanced|Streamlined|Directed|Oversaw|Produced|Authored|Coordinated|Facilitated)\s)/i,
+    )
+    .map((s) => s.trim())
+    .filter((s) => s.length > 40 && s.length < 600);
+  if (byVerbs.length >= 2) return byVerbs.slice(0, max);
+
+  // Fallback — return whole text as single block for AI to handle
+  return cleaned.length > 30 ? [cleaned.slice(0, 800)] : [];
+};
+
+// ─── Smart selective CV rewriter ──────────────────────────
+
 export const rewriteCVController = async (req, res) => {
   const { cvId, jobTargetId, tone = "balanced" } = req.body;
   const userId = req.user.id;
@@ -99,23 +151,28 @@ export const rewriteCVController = async (req, res) => {
     // Use stored parsed sections or re-extract
     let sections = cv.parsed_sections;
     if (!sections || Object.keys(sections).length === 0) {
-      console.log("No parsed_sections found — extracting from raw_text");
+      console.log("No parsed_sections — extracting from raw_text");
       sections = extractCVSections(rawText);
     }
 
-    // Check for sections with enough content to be useful (must be > 20 chars, same threshold as the for loop)
-    const processableSectionKeys = ["summary", "experience", "skills", "achievements", "projects"];
+    // Check for meaningful sections
+    const processableSectionKeys = [
+      "summary",
+      "experience",
+      "skills",
+      "achievements",
+      "projects",
+    ];
     const meaningfulSections = processableSectionKeys.filter(
       (k) => (sections[k]?.text?.trim().length ?? 0) > 20,
     );
-    console.log("Meaningful sections found:", meaningfulSections);
+    console.log("Meaningful sections:", meaningfulSections);
     console.log("Raw text length:", rawText.length);
 
-    // If no meaningful sections, rebuild from raw text
+    // If section extraction failed — use regex-based fallback
     if (meaningfulSections.length === 0) {
-      console.warn("Section extraction found nothing useful — rebuilding from raw text");
+      console.warn("Section extraction failed — using regex fallback");
 
-      // These regexes work whether text has newlines or not (handles PDF.js inline output)
       const text = rawText;
       const summaryMatch = text.match(
         /(?:SUMMARY|PROFILE|ABOUT\s+ME|OBJECTIVE)\s*[:\-]?\s*([\s\S]*?)(?=\b(?:EXPERIENCE|EMPLOYMENT|WORK HISTORY|EDUCATION|SKILLS|ACHIEVEMENTS|PROJECTS)\b|$)/i,
@@ -141,81 +198,94 @@ export const rewriteCVController = async (req, res) => {
           bullets: [],
         },
       };
-      console.log("Rebuilt sections — summary len:", sections.summary.text.length, "exp len:", sections.experience.text.length);
+
+      console.log(
+        "Rebuilt — summary:",
+        sections.summary.text.length,
+        "exp:",
+        sections.experience.text.length,
+        "skills:",
+        sections.skills.text.length,
+      );
     }
 
-    // ── Smart selective rewriting ──────────────────────
-    // Process all sections in parallel to avoid sequential AI call bottleneck
+    // ── Scoring thresholds ────────────────────────────────
+    const REWRITE_THRESHOLD = 75; // Keep original — already strong match
+    const LIGHT_THRESHOLD = 50; // Bullet-by-bullet refinement
+    // Below LIGHT_THRESHOLD → full section rewrite
 
-    const tailoredContent = {};
-    const REWRITE_THRESHOLD = 75;
-    const LIGHT_THRESHOLD = 50;
-    const MAX_BULLETS = 5; // Cap to reduce total AI calls
-
-    const sectionKeys = [
-      "summary",
-      "experience",
-      "skills",
-      "achievements",
-      "projects",
-    ];
-
+    // ── Process a single section ──────────────────────────
     const processSection = async (key) => {
       const section = sections[key];
       if (!section?.text || section.text.trim().length < 20) return null;
 
       const sectionText = section.text;
-      let bullets = section.bullets || [];
 
+      // Extract bullets — prefer stored, fall back to smart extractor
+      const storedBullets = (section.bullets || []).filter(
+        (b) => typeof b === "string" && b.length > 25,
+      );
+      const extractedBullets =
+        storedBullets.length >= 2
+          ? storedBullets.slice(0, 10)
+          : extractBulletsFromText(sectionText, 10);
+
+      // Score the section
       const matchScore = await scoreSectionMatch(sectionText, jobDescription);
-      console.log(`Section "${key}" match score: ${matchScore}`);
+      console.log(
+        `Section "${key}" score: ${matchScore} | bullets: ${extractedBullets.length}`,
+      );
 
+      // ── High match — keep original ────────────────────
       if (matchScore >= REWRITE_THRESHOLD) {
-        return [key, {
-          original: sectionText,
-          tailored: sectionText,
-          bullets_original: bullets,
-          bullets_tailored: bullets,
-          rewrite_level: "none",
-          match_score: matchScore,
-          accepted: true,
-        }];
+        return [
+          key,
+          {
+            original: sectionText,
+            tailored: sectionText,
+            bullets_original: extractedBullets,
+            bullets_tailored: extractedBullets,
+            rewrite_level: "none",
+            match_score: matchScore,
+            accepted: true,
+          },
+        ];
       }
 
-      // Build bullet list if not already extracted
-      if (bullets.length === 0 && sectionText.length > 20) {
-        bullets = sectionText
-          .split("\n")
-          .map((l) => l.replace(/^[○•\-\d.]\s*/, "").trim())
-          .filter((l) => l.length > 20)
-          .slice(0, MAX_BULLETS);
-      }
-      const bulletSlice = bullets.slice(0, MAX_BULLETS);
-
+      // ── Medium match — refine bullets ─────────────────
       if (matchScore >= LIGHT_THRESHOLD) {
         const rewrittenBullets = await Promise.all(
-          bulletSlice.map((b) =>
+          extractedBullets.map((b) =>
             rewriteSingleBullet(b, jobDescription, voiceSample)
               .then((r) => r.trim())
               .catch(() => b),
           ),
         );
-        return [key, {
-          original: sectionText,
-          tailored: rewrittenBullets.join("\n"),
-          bullets_original: bulletSlice,
-          bullets_tailored: rewrittenBullets,
-          rewrite_level: "bullet",
-          match_score: matchScore,
-          accepted: null,
-        }];
+
+        return [
+          key,
+          {
+            original: sectionText,
+            tailored: rewrittenBullets.join("\n"),
+            bullets_original: extractedBullets,
+            bullets_tailored: rewrittenBullets,
+            rewrite_level: "bullet",
+            match_score: matchScore,
+            accepted: null,
+          },
+        ];
       }
 
-      // Full rewrite + bullet rewrites in parallel
+      // ── Low match — full rewrite ───────────────────────
       const [rewritten, rewrittenBullets] = await Promise.all([
-        rewriteCVSection(key, sectionText.slice(0, 1500), jobDescription, voiceSample),
+        rewriteCVSection(
+          key,
+          sectionText.slice(0, 1500),
+          jobDescription,
+          voiceSample,
+        ),
         Promise.all(
-          bulletSlice.map((b) =>
+          extractedBullets.map((b) =>
             rewriteSingleBullet(b, jobDescription, voiceSample)
               .then((r) => r.trim())
               .catch(() => b),
@@ -223,46 +293,43 @@ export const rewriteCVController = async (req, res) => {
         ),
       ]);
 
-      return [key, {
-        original: sectionText,
-        tailored: rewritten,
-        bullets_original: bulletSlice,
-        bullets_tailored: rewrittenBullets,
-        rewrite_level: "full",
-        match_score: matchScore,
-        accepted: null,
-      }];
+      return [
+        key,
+        {
+          original: sectionText,
+          tailored: rewritten,
+          bullets_original: extractedBullets,
+          bullets_tailored: rewrittenBullets,
+          rewrite_level: "full",
+          match_score: matchScore,
+          accepted: null,
+        },
+      ];
     };
 
-    // Run all sections in parallel
-    const sectionResults = await Promise.all(sectionKeys.map(processSection));
+    // Process all sections in parallel
+    const tailoredContent = {};
+    const sectionResults = await Promise.all(
+      processableSectionKeys.map(processSection),
+    );
     for (const result of sectionResults) {
       if (result) tailoredContent[result[0]] = result[1];
     }
 
-    // Post-loop safety net — if nothing was processed, use raw text as a single experience section
-    const sectionKeysProduced = Object.keys(tailoredContent);
-    if (sectionKeysProduced.length === 0) {
-      console.warn("For loop produced no sections — forcing raw text fallback");
-      const chunks = [
-        { key: "summary", text: rawText.slice(0, 600) },
-        { key: "experience", text: rawText.slice(600, 2800) },
-        { key: "skills", text: rawText.slice(2800, 3600) },
-      ];
-      for (const { key, text } of chunks) {
-        if (text.trim().length > 20) {
-          const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 20);
-          tailoredContent[key] = {
-            original: text.trim(),
-            tailored: text.trim(),
-            bullets_original: lines,
-            bullets_tailored: lines,
-            rewrite_level: "none",
-            match_score: 50,
-            accepted: null,
-          };
-        }
-      }
+    // Safety net — if nothing processed, surface raw text
+    if (Object.keys(tailoredContent).length === 0) {
+      console.warn("All sections skipped — forcing from raw text");
+      const expText = rawText.slice(0, 3000).trim();
+      const bullets = extractBulletsFromText(expText, 10);
+      tailoredContent.experience = {
+        original: expText,
+        tailored: expText,
+        bullets_original: bullets,
+        bullets_tailored: bullets,
+        rewrite_level: "none",
+        match_score: 50,
+        accepted: null,
+      };
     }
 
     // Education always kept as-is
@@ -278,7 +345,7 @@ export const rewriteCVController = async (req, res) => {
       };
     }
 
-    // Calculate match score and detect blind spots in parallel
+    // Calculate overall match score and blind spots in parallel
     const [matchScore, blindSpots] = await Promise.all([
       calculateMatchScore(rawText, jobDescription),
       detectBlindSpots(rawText, jobDescription).catch((e) => {
@@ -292,7 +359,7 @@ export const rewriteCVController = async (req, res) => {
     tailoredContent.tone = tone;
     tailoredContent.contact_info = sections.contact_info || [];
 
-    // Create CV version
+    // Create CV version record
     const versionName = `${job.job_title} at ${job.company_name}`;
     const { data: version, error: versionError } = await supabase
       .from("cv_versions")
@@ -320,8 +387,11 @@ export const rewriteCVController = async (req, res) => {
       .eq("user_id", userId);
 
     console.log(
-      "CV rewrite complete. Sections processed:",
-      Object.keys(tailoredContent),
+      "Rewrite complete. Sections:",
+      Object.keys(tailoredContent).filter(
+        (k) =>
+          !["match_score", "blind_spots", "tone", "contact_info"].includes(k),
+      ),
     );
 
     res.json({
@@ -339,7 +409,8 @@ export const rewriteCVController = async (req, res) => {
   }
 };
 
-// Get match score
+// ─── Get match score ──────────────────────────────────────
+
 export const getMatchScore = async (req, res) => {
   const { cvId, jobTargetId } = req.body;
   const userId = req.user.id;

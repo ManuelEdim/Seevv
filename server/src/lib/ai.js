@@ -3,18 +3,13 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Initialise Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// ─── Model tiers ──────────────────────────────────────────
 const MODELS = {
-  // Fast + cheap — keyword extraction, ATS scoring, simple tasks
   flash: "gemini-2.5-flash",
-  // Powerful — deep analysis, CV rewriting, hidden need inference
   pro: "gemini-2.5-flash",
 };
 
-// ─── Core request function ────────────────────────────────
 const generateContent = async (prompt, modelTier = "flash", options = {}) => {
   const modelName = MODELS[modelTier] || MODELS.flash;
   const model = genAI.getGenerativeModel({
@@ -37,14 +32,11 @@ const generateContent = async (prompt, modelTier = "flash", options = {}) => {
         .replace(/```\n?/g, "")
         .trim();
 
-      // Attempt to fix truncated JSON by closing open brackets
       let jsonStr = cleaned;
       if (!jsonStr.endsWith("}")) {
-        // Count open vs closed braces and add missing closing braces
         const opens = (jsonStr.match(/{/g) || []).length;
         const closes = (jsonStr.match(/}/g) || []).length;
         const missing = opens - closes;
-        // Close any open arrays first
         if (jsonStr.lastIndexOf("[") > jsonStr.lastIndexOf("]")) {
           jsonStr += "]";
         }
@@ -62,16 +54,15 @@ const generateContent = async (prompt, modelTier = "flash", options = {}) => {
   return text;
 };
 
-// ─── Task-specific AI functions ───────────────────────────
+// ─── Analyse a job description — Deep Decoder ─────────────
 
-// Analyse a job description — Deep Decoder
 export const analyzeJobDescription = async (jobDescription) => {
   const prompt = `You are a senior talent intelligence analyst with 15 years of experience reading job descriptions with deep scepticism.
 
 Analyse this job description and return a JSON object with exactly this structure:
 
 {
-  "hidden_need": "2-3 sentences in plain English describing the real business problem behind this posting — what they actually need, not what they say they want",
+  "hidden_need": "2-3 sentences describing the real business problem behind this posting",
   "hidden_need_confidence": "low|medium|high",
   "culture_tone": "one of: Formal/Corporate | Startup/High-ownership | Process-driven | Remote-first | Agency/Fast-paced",
   "urgency_level": "low|medium|high",
@@ -90,11 +81,12 @@ Analyse this job description and return a JSON object with exactly this structur
 }
 
 Rules:
-- ats_keywords: return the 5 most important keywords ranked by weight
-- requirements: extract up to 8 requirements, distinguish must-have from nice-to-have
-- signals: find 3-5 phrases that reveal hidden needs
-- positioning_advice: give 3 specific, actionable pieces of advice
-- Return ONLY valid JSON, no markdown, no explanation
+- ats_keywords: return exactly 5 keywords ranked by weight as integers 0-100
+- requirements: extract exactly 5-8 requirements
+- signals: find exactly 3-5 signals
+- positioning_advice: give exactly 3 pieces of advice
+- Keep all string values concise — under 150 characters each
+- Return ONLY a single valid JSON object, nothing else, no markdown
 
 Job description:
 ${jobDescription}`;
@@ -106,7 +98,8 @@ ${jobDescription}`;
   });
 };
 
-// Extract ATS keywords only — fast and cheap
+// ─── Extract ATS keywords only ────────────────────────────
+
 export const extractKeywords = async (jobDescription) => {
   const prompt = `Extract the 10 most important ATS keywords from this job description.
 Return a JSON array of objects: [{"keyword": "string", "weight": 0-100}]
@@ -117,7 +110,8 @@ Job description: ${jobDescription}`;
   return generateContent(prompt, "flash", { json: true, temperature: 0.1 });
 };
 
-// Rewrite a CV bullet point — impact-first
+// ─── Rewrite a CV bullet point ────────────────────────────
+
 export const rewriteBullet = async (
   original,
   jobDescription,
@@ -148,7 +142,38 @@ Rules:
   });
 };
 
-// Rewrite an entire CV section
+// ─── Rewrite a single bullet with context ─────────────────
+
+export const rewriteSingleBullet = async (
+  bullet,
+  jobDescription,
+  voiceSample = null,
+) => {
+  if (!bullet || bullet.trim().length < 10) return bullet;
+
+  const voiceInstruction = voiceSample
+    ? `Match this writing voice: "${voiceSample.slice(0, 200)}"`
+    : "Use professional, confident, first-person implied tone.";
+
+  const prompt = `Rewrite this CV bullet point to be impact-first and tailored to the job.
+
+Original: "${bullet.trim()}"
+Job context: "${jobDescription.slice(0, 300)}"
+${voiceInstruction}
+
+Rules:
+- Start with a strong action verb
+- Add measurable outcomes where logical (%, numbers, scale)
+- Keep under 30 words
+- Sound human, not generic AI
+- If already strong and relevant, improve minimally
+- Return ONLY the rewritten bullet, nothing else`;
+
+  return generateContent(prompt, "pro", { temperature: 0.5, maxTokens: 80 });
+};
+
+// ─── Rewrite an entire CV section ─────────────────────────
+
 export const rewriteCVSection = async (
   sectionType,
   content,
@@ -178,7 +203,8 @@ Rules:
   return generateContent(prompt, "pro", { temperature: 0.6 });
 };
 
-// Calculate match score between CV and job description
+// ─── Calculate match score ────────────────────────────────
+
 export const calculateMatchScore = async (cvText, jobDescription) => {
   const prompt = `Score how well this CV matches this job description.
 
@@ -204,7 +230,8 @@ Job description: ${jobDescription.slice(0, 1000)}`;
   return generateContent(prompt, "flash", { json: true, temperature: 0.1 });
 };
 
-// Generate a cover letter
+// ─── Generate a cover letter ──────────────────────────────
+
 export const generateCoverLetter = async (
   jobTitle,
   companyName,
@@ -248,7 +275,8 @@ Rules:
   return generateContent(prompt, "pro", { temperature: 0.7 });
 };
 
-// Detect blind spots in a CV
+// ─── Detect blind spots in a CV ───────────────────────────
+
 export const detectBlindSpots = async (cvText, jobDescription) => {
   const prompt = `Analyse this CV for blind spots — places where the candidate demonstrates a skill or achievement without naming it clearly.
 
@@ -269,55 +297,39 @@ Job description: ${jobDescription.slice(0, 500)}`;
   return generateContent(prompt, "flash", { json: true, temperature: 0.3 });
 };
 
-// Smart section scorer — decides if a section needs rewriting
+// ─── Score how well a section matches a job ───────────────
+
 export const scoreSectionMatch = async (sectionText, jobDescription) => {
   if (!sectionText || sectionText.trim().length < 20) return 0;
 
-  const prompt = `Score how well this CV section matches this job description.
-Return ONLY a single integer between 0 and 100. Nothing else.
+  const prompt = `You are an ATS scoring engine. Score how well this CV section matches this job description.
+
+Return ONLY a single integer between 0 and 100. No explanation. No punctuation. Just the number.
+
+Examples of valid responses: 45
+Examples of invalid responses: "45/100", "Score: 45", "45%"
 
 CV section:
-${sectionText.slice(0, 500)}
+${sectionText.slice(0, 600)}
 
 Job description:
-${jobDescription.slice(0, 400)}`;
+${jobDescription.slice(0, 500)}
 
-  const result = await generateContent(prompt, "flash", {
-    temperature: 0.1,
-    maxTokens: 10,
-  });
+Score (0-100):`;
 
-  const score = parseInt(result.trim(), 10);
-  return isNaN(score) ? 50 : Math.min(100, Math.max(0, score));
-};
-
-// Rewrite a single bullet point with context
-export const rewriteSingleBullet = async (
-  bullet,
-  jobDescription,
-  voiceSample = null,
-) => {
-  if (!bullet || bullet.trim().length < 10) return bullet;
-
-  const voiceInstruction = voiceSample
-    ? `Match this writing voice: "${voiceSample.slice(0, 200)}"`
-    : "Use professional, confident, first-person implied tone.";
-
-  const prompt = `Rewrite this CV bullet point to be impact-first and tailored to the job.
-
-Original: "${bullet.trim()}"
-Job context: "${jobDescription.slice(0, 300)}"
-${voiceInstruction}
-
-Rules:
-- Start with a strong action verb
-- Add measurable outcomes where logical (%, numbers, scale)
-- Keep under 30 words
-- Sound human, not generic AI
-- If already strong and relevant, improve minimally
-- Return ONLY the rewritten bullet, nothing else`;
-
-  return generateContent(prompt, "pro", { temperature: 0.5, maxTokens: 80 });
+  try {
+    const result = await generateContent(prompt, "flash", {
+      temperature: 0.1,
+      maxTokens: 5,
+    });
+    const cleaned = result.trim().replace(/[^0-9]/g, "");
+    const score = parseInt(cleaned, 10);
+    console.log(`Raw score response: "${result.trim()}" → parsed: ${score}`);
+    return isNaN(score) ? 50 : Math.min(100, Math.max(0, score));
+  } catch (err) {
+    console.warn("Score section failed:", err.message);
+    return 50;
+  }
 };
 
 export default {
