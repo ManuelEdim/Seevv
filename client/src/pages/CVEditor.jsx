@@ -677,11 +677,15 @@ const CVEditor = () => {
         throw new Error(err.error || "Export failed");
       }
 
+      const disposition = response.headers.get("Content-Disposition");
+      const match = disposition && disposition.match(/filename="([^"]+)"/);
+      const fileName = match ? match[1] : `${version.version_name || "CV"}.pdf`;
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${version.version_name || "CV"}.pdf`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

@@ -329,8 +329,14 @@ const buildCVHtml = ({
     }
 
     /* ── Page break control ── */
+    .section {
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+
     .role {
       page-break-inside: avoid;
+      break-inside: avoid;
     }
   </style>
 </head>
