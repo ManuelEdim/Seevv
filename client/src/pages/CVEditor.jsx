@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Badge, Spinner, Card } from "@/components/ui";
 import useCVEditor from "@/hooks/useCVEditor";
@@ -22,6 +22,83 @@ const rewriteLabelConfig = {
   },
 };
 
+// ─── Calculate pending decisions across all sections ──────
+
+const getTotalPending = (tc) => {
+  let pending = 0;
+  let total = 0;
+
+  // Summary
+  if (tc.summary && tc.summary.rewrite_level !== "none") {
+    const decisions = tc.summary.bullet_decisions || {};
+    const bullets =
+      Array.isArray(tc.summary.bullets_tailored) &&
+      tc.summary.bullets_tailored.length > 0
+        ? tc.summary.bullets_tailored
+        : [tc.summary.tailored].filter(Boolean);
+    bullets.forEach((_, i) => {
+      total++;
+      if (decisions[i] === undefined) pending++;
+    });
+  }
+
+  // Experience roles
+  if (tc.experience && tc.experience.rewrite_level !== "none") {
+    const roles =
+      tc.experience.roles_tailored || tc.experience.roles_original || [];
+    roles.forEach((role) => {
+      const decisions = role.bullet_decisions || {};
+      (role.bullets || []).forEach((_, i) => {
+        total++;
+        if (decisions[i] === undefined) pending++;
+      });
+    });
+
+    // Fallback flat bullets if no roles
+    if (roles.length === 0) {
+      const decisions = tc.experience.bullet_decisions || {};
+      (tc.experience.bullets_tailored || []).forEach((_, i) => {
+        total++;
+        if (decisions[i] === undefined) pending++;
+      });
+    }
+  }
+
+  // Skills
+  if (tc.skills && tc.skills.rewrite_level !== "none") {
+    const decisions = tc.skills.bullet_decisions || {};
+    const bullets =
+      Array.isArray(tc.skills.bullets_tailored) &&
+      tc.skills.bullets_tailored.length > 0
+        ? tc.skills.bullets_tailored
+        : [tc.skills.tailored].filter(Boolean);
+    bullets.forEach((_, i) => {
+      total++;
+      if (decisions[i] === undefined) pending++;
+    });
+  }
+
+  // Achievements
+  if (tc.achievements && tc.achievements.rewrite_level !== "none") {
+    const decisions = tc.achievements.bullet_decisions || {};
+    (tc.achievements.bullets_tailored || []).forEach((_, i) => {
+      total++;
+      if (decisions[i] === undefined) pending++;
+    });
+  }
+
+  // Projects
+  if (tc.projects && tc.projects.rewrite_level !== "none") {
+    const decisions = tc.projects.bullet_decisions || {};
+    (tc.projects.bullets_tailored || []).forEach((_, i) => {
+      total++;
+      if (decisions[i] === undefined) pending++;
+    });
+  }
+
+  return { pending, total };
+};
+
 // ─── Single bullet with accept / reject ──────────────────
 
 const BulletRow = ({
@@ -37,7 +114,7 @@ const BulletRow = ({
 
   if (autoAccepted && unchanged) {
     return (
-      <li className="text-sm text-gray-700 leading-relaxed py-0.5">
+      <li className="text-sm text-gray-700 leading-relaxed py-0.5 list-none">
         {tailored}
       </li>
     );
@@ -118,16 +195,30 @@ const BulletRow = ({
 
 // ─── Experience role block ────────────────────────────────
 
-const RoleBlock = ({ role }) => {
+const RoleBlock = ({ role, onDecisionChange, sectionKey, roleIndex }) => {
   const bullets = role.bullets || [];
   const bulletsOriginal = role.bullets_original || bullets;
   const autoAccepted = role.rewrite_level === "none";
 
+  const savedDecisions = role.bullet_decisions || {};
   const [bulletStates, setBulletStates] = useState(
-    bullets.map(() => (autoAccepted ? true : undefined)),
+    bullets.map((_, i) =>
+      autoAccepted ? true : (savedDecisions[i] ?? undefined),
+    ),
   );
 
   const pendingCount = bulletStates.filter((s) => s === undefined).length;
+
+  const handleDecision = (i, value) => {
+    setBulletStates((prev) => {
+      const next = [...prev];
+      next[i] = value;
+      if (onDecisionChange) {
+        onDecisionChange(sectionKey, roleIndex, i, value);
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="mb-5">
@@ -135,7 +226,15 @@ const RoleBlock = ({ role }) => {
         <p className="text-sm font-semibold text-gray-900">{role.title}</p>
         {pendingCount > 0 && (
           <button
-            onClick={() => setBulletStates(bullets.map(() => true))}
+            onClick={() => {
+              const allAccepted = bullets.map(() => true);
+              setBulletStates(allAccepted);
+              if (onDecisionChange) {
+                bullets.forEach((_, i) =>
+                  onDecisionChange(sectionKey, roleIndex, i, true),
+                );
+              }
+            }}
             className="text-xs text-brand-600 hover:text-brand-800 cursor-pointer font-medium flex-shrink-0"
           >
             Accept all
@@ -155,20 +254,8 @@ const RoleBlock = ({ role }) => {
             tailored={bullet}
             accepted={bulletStates[i]}
             autoAccepted={autoAccepted}
-            onAccept={() =>
-              setBulletStates((prev) => {
-                const next = [...prev];
-                next[i] = true;
-                return next;
-              })
-            }
-            onReject={() =>
-              setBulletStates((prev) => {
-                const next = [...prev];
-                next[i] = false;
-                return next;
-              })
-            }
+            onAccept={() => handleDecision(i, true)}
+            onReject={() => handleDecision(i, false)}
           />
         ))}
       </ul>
@@ -178,7 +265,7 @@ const RoleBlock = ({ role }) => {
 
 // ─── Generic section (summary, skills etc) ────────────────
 
-const GenericSection = ({ sectionKey, label, section }) => {
+const GenericSection = ({ sectionKey, label, section, onDecisionChange }) => {
   const autoAccepted = section.accepted === true;
   const rewriteLevel = section.rewrite_level || "full";
 
@@ -186,15 +273,14 @@ const GenericSection = ({ sectionKey, label, section }) => {
     const hasBullets =
       Array.isArray(section.bullets_tailored) &&
       section.bullets_tailored.length > 0 &&
-      section.bullets_tailored.every((b) => b && b.trim().length > 35);
-
+      section.bullets_tailored.every((b) => b && b.trim().length > 10);
     if (hasBullets) return section.bullets_tailored;
 
     const tailored = section.tailored || section.text || "";
     return tailored
       .split(/\n|(?<=[.!?])\s+(?=[A-Z])/)
-      .map((l) => l.replace(/^[-•·▪▸►*○✓\d+.)\s]+/, "").trim())
-      .filter((l) => l.length > 35);
+      .map((l) => l.replace(/^[-•·▪▸►*○●✓\d+.)\s]+/, "").trim())
+      .filter((l) => l.length > 20);
   })();
 
   const bulletsOriginal = (() => {
@@ -203,26 +289,37 @@ const GenericSection = ({ sectionKey, label, section }) => {
       section.bullets_original.length > 0
     )
       return section.bullets_original;
-
     const original = section.original || section.text || "";
     return original
       .split(/\n|(?<=[.!?])\s+(?=[A-Z])/)
-      .map((l) => l.replace(/^[-•·▪▸►*○✓\d+.)\s]+/, "").trim())
-      .filter((l) => l.length > 35);
+      .map((l) => l.replace(/^[-•·▪▸►*○●✓\d+.)\s]+/, "").trim())
+      .filter((l) => l.length > 20);
   })();
 
+  const savedDecisions = section.bullet_decisions || {};
   const [bulletStates, setBulletStates] = useState(
-    bullets.map(() => (autoAccepted ? true : undefined)),
+    bullets.map((_, i) =>
+      autoAccepted ? true : (savedDecisions[i] ?? undefined),
+    ),
   );
 
   const pendingCount = bulletStates.filter((s) => s === undefined).length;
+
+  const handleDecision = (i, value) => {
+    setBulletStates((prev) => {
+      const next = [...prev];
+      next[i] = value;
+      if (onDecisionChange) onDecisionChange(sectionKey, null, i, value);
+      return next;
+    });
+  };
 
   if (bullets.length === 0) return null;
 
   return (
     <div className="mb-5">
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest">
             {label}
           </h3>
@@ -236,7 +333,14 @@ const GenericSection = ({ sectionKey, label, section }) => {
         </div>
         {pendingCount > 0 && (
           <button
-            onClick={() => setBulletStates(bullets.map(() => true))}
+            onClick={() => {
+              setBulletStates(bullets.map(() => true));
+              if (onDecisionChange) {
+                bullets.forEach((_, i) =>
+                  onDecisionChange(sectionKey, null, i, true),
+                );
+              }
+            }}
             className="text-xs text-brand-600 hover:text-brand-800 cursor-pointer font-medium"
           >
             Accept all
@@ -253,20 +357,8 @@ const GenericSection = ({ sectionKey, label, section }) => {
             tailored={bullet}
             accepted={bulletStates[i]}
             autoAccepted={autoAccepted}
-            onAccept={() =>
-              setBulletStates((prev) => {
-                const next = [...prev];
-                next[i] = true;
-                return next;
-              })
-            }
-            onReject={() =>
-              setBulletStates((prev) => {
-                const next = [...prev];
-                next[i] = false;
-                return next;
-              })
-            }
+            onAccept={() => handleDecision(i, true)}
+            onReject={() => handleDecision(i, false)}
           />
         ))}
       </ul>
@@ -276,7 +368,7 @@ const GenericSection = ({ sectionKey, label, section }) => {
 
 // ─── Experience section ───────────────────────────────────
 
-const ExperienceSection = ({ section }) => {
+const ExperienceSection = ({ section, onDecisionChange }) => {
   const rewriteLevel = section.rewrite_level || "full";
   const roles = section.roles_tailored || section.roles_original || [];
 
@@ -286,6 +378,7 @@ const ExperienceSection = ({ section }) => {
         sectionKey="experience"
         label="Experience"
         section={section}
+        onDecisionChange={onDecisionChange}
       />
     );
   }
@@ -306,7 +399,13 @@ const ExperienceSection = ({ section }) => {
       </div>
       <div className="h-px bg-gray-200 mb-3" />
       {roles.map((role, i) => (
-        <RoleBlock key={i} role={role} />
+        <RoleBlock
+          key={i}
+          role={role}
+          roleIndex={i}
+          sectionKey="experience"
+          onDecisionChange={onDecisionChange}
+        />
       ))}
     </div>
   );
@@ -319,7 +418,7 @@ const ATSPreview = ({ version, tailoredContent }) => {
 
   if (tailoredContent?.summary?.tailored) {
     lines.push(`SUMMARY\n${"─".repeat(40)}`);
-    lines.push(tailoredContent.summary.tailored.slice(0, 400));
+    lines.push(tailoredContent.summary.tailored.slice(0, 500));
     lines.push("");
   }
 
@@ -332,7 +431,7 @@ const ATSPreview = ({ version, tailoredContent }) => {
 
     if (roles.length > 0) {
       roles.forEach((role) => {
-        lines.push(`${role.title}`);
+        lines.push(role.title);
         if (role.company) lines.push(role.company);
         (role.bullets || []).forEach((b) => lines.push(`  • ${b}`));
         lines.push("");
@@ -344,11 +443,13 @@ const ATSPreview = ({ version, tailoredContent }) => {
     }
   }
 
-  if (tailoredContent?.skills?.tailored) {
+  if (tailoredContent?.skills) {
     lines.push(`SKILLS\n${"─".repeat(40)}`);
-    const skillBullets = tailoredContent.skills.bullets_tailored || [
-      tailoredContent.skills.tailored,
-    ];
+    const skillBullets =
+      tailoredContent.skills.bullets_tailored ||
+      (tailoredContent.skills.tailored
+        ? [tailoredContent.skills.tailored]
+        : []);
     skillBullets.forEach((b) => lines.push(`  • ${b}`));
   }
 
@@ -374,6 +475,7 @@ const CVEditor = () => {
   const { toast } = useToast();
   const [activePanel, setActivePanel] = useState("editor");
   const [isExporting, setIsExporting] = useState(false);
+  const [isSavingDecisions, setIsSavingDecisions] = useState(false);
 
   const {
     version,
@@ -385,6 +487,63 @@ const CVEditor = () => {
     saveVersion,
     updateTone,
   } = useCVEditor();
+
+  // Save accept/reject decision back to Supabase immediately
+  const handleDecisionChange = useCallback(
+    async (sectionKey, roleIndex, bulletIndex, accepted) => {
+      if (!version?.id) return;
+      setIsSavingDecisions(true);
+
+      try {
+        const tc = JSON.parse(JSON.stringify(version.tailored_content || {}));
+
+        if (sectionKey === "experience" && roleIndex !== null) {
+          const roles =
+            tc.experience?.roles_tailored ||
+            tc.experience?.roles_original ||
+            [];
+          if (roles[roleIndex]) {
+            if (!roles[roleIndex].bullet_decisions) {
+              roles[roleIndex].bullet_decisions = {};
+            }
+            roles[roleIndex].bullet_decisions[bulletIndex] = accepted;
+            if (tc.experience.roles_tailored?.[roleIndex]) {
+              tc.experience.roles_tailored[roleIndex].bullet_decisions =
+                roles[roleIndex].bullet_decisions;
+            }
+          }
+        } else {
+          if (!tc[sectionKey]) tc[sectionKey] = {};
+          if (!tc[sectionKey].bullet_decisions) {
+            tc[sectionKey].bullet_decisions = {};
+          }
+          tc[sectionKey].bullet_decisions[bulletIndex] = accepted;
+        }
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+
+        await fetch(
+          `${import.meta.env.VITE_API_URL}/cv/version/${version.id}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ tailored_content: tc }),
+          },
+        );
+      } catch (err) {
+        console.error("Failed to save decision:", err.message);
+      } finally {
+        setIsSavingDecisions(false);
+      }
+    },
+    [version],
+  );
 
   const handleSave = async () => {
     try {
@@ -401,7 +560,6 @@ const CVEditor = () => {
     toast.info("Generating your PDF — this takes a few seconds...");
 
     try {
-      // Get current session token
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -424,7 +582,6 @@ const CVEditor = () => {
         throw new Error(err.error || "Export failed");
       }
 
-      // Trigger browser download
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -478,6 +635,11 @@ const CVEditor = () => {
     (k) => !["match_score", "blind_spots", "tone", "contact_info"].includes(k),
   );
 
+  // ── Export lock logic ─────────────────────────────────
+  const { pending: pendingDecisions, total: totalDecisions } =
+    getTotalPending(tc);
+  const exportReady = pendingDecisions === 0;
+
   return (
     <div className="max-w-4xl mx-auto space-y-4 pb-10">
       {/* ── Header ───────────────────────────────────── */}
@@ -515,7 +677,6 @@ const CVEditor = () => {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Tone selector */}
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
             {["conservative", "balanced", "bold"].map((t) => (
               <button
@@ -532,6 +693,12 @@ const CVEditor = () => {
             ))}
           </div>
 
+          {isSavingDecisions && (
+            <span className="text-xs text-gray-400 animate-pulse">
+              Saving...
+            </span>
+          )}
+
           {hasUnsavedChanges && (
             <Button
               variant="primary"
@@ -543,13 +710,20 @@ const CVEditor = () => {
             </Button>
           )}
 
+          {/* Export PDF — locked until all reviewed */}
           <Button
             variant="outline"
             size="sm"
-            onClick={handleExportPdf}
+            onClick={exportReady ? handleExportPdf : undefined}
             isLoading={isExporting}
+            disabled={!exportReady}
+            title={
+              !exportReady
+                ? `${pendingDecisions} bullets still need review`
+                : "Export PDF"
+            }
           >
-            Export PDF
+            {exportReady ? "Export PDF" : `${pendingDecisions} pending`}
           </Button>
         </div>
       </div>
@@ -577,7 +751,6 @@ const CVEditor = () => {
       {/* ── Editor ───────────────────────────────────── */}
       {activePanel === "editor" && (
         <div className="space-y-4">
-          {/* Info banner */}
           <div className="bg-brand-50 border border-brand-100 rounded-xl px-4 py-3">
             <p className="text-xs text-brand-800">
               <span className="font-semibold">
@@ -585,7 +758,8 @@ const CVEditor = () => {
               </span>{" "}
               Sections with a strong match are kept as-is (green). Others are
               rewritten bullet by bullet or fully. Accept what sounds right,
-              reject what doesn't — rejected bullets revert to your original.
+              reject what doesn't — decisions are saved automatically and
+              reflected in your PDF export.
             </p>
           </div>
 
@@ -594,7 +768,7 @@ const CVEditor = () => {
               <p className="text-sm text-gray-500 text-center py-6">
                 No sections found. Try re-running the tailor from the decoder.
               </p>
-              <div className="flex justify-center">
+              <div className="flex justify-center mt-3">
                 <Button
                   variant="outline"
                   onClick={() =>
@@ -622,11 +796,17 @@ const CVEditor = () => {
                   sectionKey="summary"
                   label="Summary"
                   section={tc.summary}
+                  onDecisionChange={handleDecisionChange}
                 />
               )}
 
               {/* Experience */}
-              {tc.experience && <ExperienceSection section={tc.experience} />}
+              {tc.experience && (
+                <ExperienceSection
+                  section={tc.experience}
+                  onDecisionChange={handleDecisionChange}
+                />
+              )}
 
               {/* Skills */}
               {tc.skills && (
@@ -634,6 +814,7 @@ const CVEditor = () => {
                   sectionKey="skills"
                   label="Core Skills & Technologies"
                   section={tc.skills}
+                  onDecisionChange={handleDecisionChange}
                 />
               )}
 
@@ -643,6 +824,7 @@ const CVEditor = () => {
                   sectionKey="achievements"
                   label="Achievements"
                   section={tc.achievements}
+                  onDecisionChange={handleDecisionChange}
                 />
               )}
 
@@ -652,6 +834,7 @@ const CVEditor = () => {
                   sectionKey="projects"
                   label="Projects"
                   section={tc.projects}
+                  onDecisionChange={handleDecisionChange}
                 />
               )}
 
@@ -663,7 +846,7 @@ const CVEditor = () => {
                   </h3>
                   <div className="h-px bg-gray-200 mb-3" />
                   <p className="text-xs text-gray-500 italic mb-2">
-                    ✓ Education kept from your original CV
+                    ✓ Kept from your original CV
                   </p>
                   <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
                     {tc.education.original}
@@ -673,7 +856,38 @@ const CVEditor = () => {
             </div>
           )}
 
-          {/* Bottom actions */}
+          {/* Progress banner + bottom actions */}
+          {!exportReady && totalDecisions > 0 && (
+            <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-amber-800">
+                  <span className="font-semibold">
+                    {pendingDecisions} of {totalDecisions} bullets
+                  </span>{" "}
+                  still need review before you can export.
+                </p>
+                <span className="text-xs text-amber-600 font-medium">
+                  {Math.round(
+                    ((totalDecisions - pendingDecisions) / totalDecisions) *
+                      100,
+                  )}
+                  % done
+                </span>
+              </div>
+              <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-amber-500 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${Math.round(
+                      ((totalDecisions - pendingDecisions) / totalDecisions) *
+                        100,
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <Button
               variant="primary"
@@ -684,12 +898,15 @@ const CVEditor = () => {
               Save all changes
             </Button>
             <Button
-              variant="outline"
+              variant={exportReady ? "primary" : "outline"}
               fullWidth
-              onClick={handleExportPdf}
+              onClick={exportReady ? handleExportPdf : undefined}
               isLoading={isExporting}
+              disabled={!exportReady}
             >
-              Export as PDF
+              {exportReady
+                ? "Export as PDF"
+                : `Review ${pendingDecisions} remaining`}
             </Button>
           </div>
         </div>

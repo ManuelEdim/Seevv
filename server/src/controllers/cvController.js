@@ -63,14 +63,14 @@ export const parseCVController = async (req, res) => {
 const extractBulletsFromText = (text, max = 10) => {
   const cleaned = text.trim();
 
-  // ○ bullets (DOCX experience format)
+  // ○ bullets (experience format)
   const byCircle = cleaned
     .split(/○\s+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 35 && s.length < 600);
   if (byCircle.length >= 2) return byCircle.slice(0, max);
 
-  // ● bullets (DOCX skills format)
+  // ● bullets (skills/new CV format)
   const byDot = cleaned
     .split(/●\s+/)
     .map((s) => s.trim())
@@ -95,22 +95,20 @@ const extractBulletsFromText = (text, max = 10) => {
 };
 
 // ─── Parse experience into structured roles ───────────────
-// Works with the exact format of your DOCX:
-// "1. Role Title – Company\ncompany line\n○ bullet ○ bullet"
-// or flat: "1. Role Title – Company ○ bullet ○ bullet"
+// Handles both CV formats:
+// Old: "1. Role – Company\nDate\n○ bullet\n○ bullet"
+// New: "1. Role\nCompany | Date\n● bullet\n● bullet"
 
 const parseExperienceSection = (text) => {
   if (!text) return [];
 
-  // Split on numbered role entries: "1. ", "2. " etc.
-  // Works whether text has newlines or is flat
+  // Split on numbered role entries at start: "1. ", "2. " etc.
   const roleBlocks = text
-    .split(/(?=\d+\.\s+[A-Z])/)
+    .split(/\n(?=\d+\.\s+[A-Z])/)
     .map((s) => s.trim())
     .filter((s) => s.length > 30);
 
   if (roleBlocks.length === 0) {
-    // No numbered roles — return flat bullets
     return [
       {
         title: "Experience",
@@ -123,63 +121,85 @@ const parseExperienceSection = (text) => {
 
   return roleBlocks
     .map((block) => {
-      // Remove the leading number "1. "
+      // Remove leading number "1. "
       const withoutNumber = block.replace(/^\d+\.\s+/, "").trim();
+      const lines = withoutNumber
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
 
-      // Find where bullets start (○ marker)
-      const firstCircle = withoutNumber.indexOf("○");
-      const firstNewline = withoutNumber.indexOf("\n");
+      if (lines.length === 0) return null;
 
-      let headerPart, bulletsPart;
-
-      if (
-        firstNewline > -1 &&
-        (firstCircle === -1 || firstNewline < firstCircle)
-      ) {
-        // Has a real newline — split there
-        headerPart = withoutNumber.slice(0, firstNewline).trim();
-        bulletsPart = withoutNumber.slice(firstNewline + 1).trim();
-      } else if (firstCircle > -1) {
-        // No newline — split at first ○
-        headerPart = withoutNumber.slice(0, firstCircle).trim();
-        bulletsPart = withoutNumber.slice(firstCircle).trim();
-      } else {
-        headerPart = withoutNumber;
-        bulletsPart = "";
-      }
-
-      // Parse title and company from header
-      // Format: "Role Title – Company" or "Role Title\nCompany, Date"
-      let title = headerPart;
+      // ── Title line ─────────────────────────────────────
+      let title = lines[0];
       let company = "";
+      let period = "";
+      let bulletStartLine = 1;
 
-      const dashMatch = headerPart.match(/^(.+?)\s*[–\-—]\s*(.+)$/);
-      if (dashMatch) {
-        title = dashMatch[1].trim();
-        company = dashMatch[2].trim();
+      // Check if title contains a dash separator "Role – Company"
+      const titleDash = title.match(/^(.+?)\s*[–\-—]\s*(.+)$/);
+      if (titleDash) {
+        title = titleDash[1].trim();
+        company = titleDash[2].trim();
       }
 
-      // Check if bulletsPart starts with a company line before ○
-      if (bulletsPart && !bulletsPart.startsWith("○")) {
-        const companyLineEnd = bulletsPart.indexOf("○");
-        if (companyLineEnd > -1) {
-          const potentialCompany = bulletsPart.slice(0, companyLineEnd).trim();
-          if (potentialCompany.length < 80) {
-            if (!company) company = potentialCompany;
-            bulletsPart = bulletsPart.slice(companyLineEnd).trim();
+      // ── Second line — company / date ───────────────────
+      if (lines[1] && !/^[○●\-•]/.test(lines[1])) {
+        const secondLine = lines[1];
+
+        // Try "Company | Date" or "Company – Date" split
+        const pipeSplit = secondLine.match(/^(.+?)\s*[|]\s*(.+)$/);
+        const dashSplit = secondLine.match(/^(.+?)\s*[–\-—]\s*(.+)$/);
+
+        if (pipeSplit) {
+          if (!company) company = pipeSplit[1].trim();
+          period = pipeSplit[2].trim();
+          bulletStartLine = 2;
+        } else if (dashSplit && !company) {
+          company = dashSplit[1].trim();
+          period = dashSplit[2].trim();
+          bulletStartLine = 2;
+        } else if (
+          /\d{4}|present|current|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(
+            secondLine,
+          )
+        ) {
+          // Looks like a date line
+          if (!company) {
+            company = secondLine;
+          } else {
+            period = secondLine;
           }
+          bulletStartLine = 2;
+        } else if (secondLine.length < 80) {
+          // Short line — treat as company if we don't have one
+          if (!company) company = secondLine;
+          bulletStartLine = 2;
         }
       }
 
-      // Extract bullets from ○ markers
-      const bullets = bulletsPart
-        .split(/○\s+/)
-        .map((s) => s.trim())
-        .filter((s) => s.length > 20);
+      // ── Extract bullets ────────────────────────────────
+      // Support both ○ (old CV) and ● (new CV) bullet formats
+      const bulletLines = lines.slice(bulletStartLine);
+      const bullets = bulletLines
+        .map((l) => l.replace(/^[○●\-•·▪]\s*/, "").trim())
+        .filter((l) => l.length > 20);
 
-      return { title, company, period: "", bullets };
+      // If no structured bullets found — try splitting the remaining
+      // text on bullet markers inline
+      if (bullets.length === 0) {
+        const remaining = bulletLines.join(" ");
+        const byMarker = remaining
+          .split(/[○●]\s+/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 20);
+        if (byMarker.length > 0)
+          return { title, company, period, bullets: byMarker };
+      }
+
+      return { title, company, period, bullets };
     })
-    .filter((role) => role.bullets.length > 0);
+    .filter((role) => role !== null && role.title.length > 0);
 };
 
 // ─── Smart selective CV rewriter ──────────────────────────
@@ -256,11 +276,9 @@ export const rewriteCVController = async (req, res) => {
     console.log("Meaningful sections:", meaningfulSections);
     console.log("Raw text length:", rawText.length);
 
-    // If STILL nothing — use regex fallback directly on rawText
+    // If still nothing — regex fallback on rawText
     if (meaningfulSections.length === 0) {
-      console.warn(
-        "Section extraction found nothing — running regex on rawText",
-      );
+      console.warn("Section extraction found nothing — running regex fallback");
 
       const summaryMatch = rawText.match(
         /\bSUMMARY\b\s+([\s\S]*?)(?=\bEXPERIENCE\b|\bEDUCATION\b|\bSKILLS\b)/i,
@@ -313,7 +331,9 @@ export const rewriteCVController = async (req, res) => {
         const roles = parseExperienceSection(sectionText);
         console.log(`Experience: ${roles.length} roles found`);
         roles.forEach((r) =>
-          console.log(`  Role: "${r.title}" | bullets: ${r.bullets.length}`),
+          console.log(
+            `  Role: "${r.title}" | company: "${r.company}" | period: "${r.period}" | bullets: ${r.bullets.length}`,
+          ),
         );
 
         if (matchScore >= REWRITE_THRESHOLD) {
@@ -366,9 +386,6 @@ export const rewriteCVController = async (req, res) => {
 
       // ── Other sections ────────────────────────────────
 
-      // Use stored bullets if available (from new extractCVSections)
-      // For skills this will be the ● split items
-      // For summary this will be the full prose text
       const storedBullets = (section.bullets || []).filter(
         (b) => typeof b === "string" && b.trim().length > 10,
       );
@@ -378,7 +395,6 @@ export const rewriteCVController = async (req, res) => {
           ? storedBullets.slice(0, 10)
           : extractBulletsFromText(sectionText, 10);
 
-      // Quality check — if bullets are too short on average, re-extract
       const avgLength =
         extractedBullets.reduce((sum, b) => sum + b.length, 0) /
         (extractedBullets.length || 1);
@@ -397,7 +413,6 @@ export const rewriteCVController = async (req, res) => {
         `Section "${key}" | bullets: ${extractedBullets.length} | avg len: ${Math.round(avgLength)}`,
       );
 
-      // High match — keep original
       if (matchScore >= REWRITE_THRESHOLD) {
         return [
           key,
@@ -413,7 +428,6 @@ export const rewriteCVController = async (req, res) => {
         ];
       }
 
-      // Batch rewrite all bullets at once — no truncation
       const rewrittenBullets = await rewriteBulletsInBatch(
         extractedBullets,
         key,
@@ -421,7 +435,6 @@ export const rewriteCVController = async (req, res) => {
         voiceSample,
       );
 
-      // Full section rewrite for very low match
       let fullRewrite = rewrittenBullets.join("\n");
       if (matchScore < LIGHT_THRESHOLD) {
         try {
@@ -490,7 +503,6 @@ export const rewriteCVController = async (req, res) => {
       };
     }
 
-    // Match score + blind spots in parallel
     const [matchScore, blindSpots] = await Promise.all([
       calculateMatchScore(rawText, jobDescription),
       detectBlindSpots(rawText, jobDescription).catch((e) => {

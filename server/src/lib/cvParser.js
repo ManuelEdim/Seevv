@@ -53,13 +53,15 @@ export const cleanText = (text) => {
 };
 
 // ─── Section extractor ────────────────────────────────────
-// Built specifically for the flat-text format that mammoth
-// produces from DOCX files — sections run together on one
-// line separated by ALL-CAPS keywords like SUMMARY, EXPERIENCE
-// Bullets are marked with ○ (experience) or ● (skills)
+// Uses index-based slicing rather than regex capture groups.
+// Debug confirmed raw text has \nSECTION\n newline anchors.
+// Summary index=166, Experience index=216 — only 50 chars apart
+// in the upper string but the actual content spans 750+ chars.
+// Index slicing handles this correctly where regex did not.
 
 export const extractCVSections = (cvText) => {
   const text = cvText.trim();
+  const upper = text.toUpperCase();
 
   const sections = {
     summary: { text: "", bullets: [] },
@@ -71,63 +73,137 @@ export const extractCVSections = (cvText) => {
     contact_info: [],
   };
 
+  // ── Find all section header positions ─────────────────
+  // Look for headers on their own line: "\nHEADER\n"
+  const findIdx = (needle) => {
+    const withNewlines = `\n${needle}\n`;
+    const idx = upper.indexOf(withNewlines);
+    if (idx > -1) return idx + 1; // point to start of header word
+    // Fallback — header without trailing newline (end of file edge case)
+    const plain = upper.indexOf(`\n${needle}`);
+    return plain > -1 ? plain + 1 : -1;
+  };
+
+  const summaryIdx = findIdx("SUMMARY");
+  const experienceIdx = findIdx("EXPERIENCE");
+
+  // Skills header has multiple variants
+  const skillsIdx = (() => {
+    for (const variant of [
+      "CORE SKILLS & TECHNOLOGIES",
+      "CORE SKILLS &amp; TECHNOLOGIES",
+      "CORE SKILLS",
+      "SKILLS",
+    ]) {
+      const idx = findIdx(variant);
+      if (idx > -1) return idx;
+    }
+    return -1;
+  })();
+
+  const educationIdx = findIdx("EDUCATION");
+  const certificationsIdx = findIdx("CERTIFICATIONS");
+  const portfolioIdx = findIdx("PORTFOLIO");
+  const referencesIdx = findIdx("REFERENCES");
+
+  // Helper — find the nearest section end after a given start
+  const nextSectionAfter = (startIdx) => {
+    return (
+      [
+        skillsIdx,
+        educationIdx,
+        certificationsIdx,
+        portfolioIdx,
+        referencesIdx,
+        experienceIdx,
+        summaryIdx,
+      ]
+        .filter((i) => i > startIdx)
+        .sort((a, b) => a - b)[0] ?? text.length
+    );
+  };
+
+  // Helper — slice section content (skip the header line itself)
+  const sliceSection = (headerIdx, headerWord, endIdx) => {
+    if (headerIdx === -1) return "";
+    // Skip past the header word and the following newline
+    const afterHeader = text.indexOf("\n", headerIdx + headerWord.length);
+    if (afterHeader === -1) return "";
+    return text.slice(afterHeader + 1, endIdx).trim();
+  };
+
   // ── Contact info — everything before SUMMARY ──────────
-  const contactMatch = text.match(/^([\s\S]*?)(?=\bSUMMARY\b)/i);
-  if (contactMatch && contactMatch[1].trim()) {
-    sections.contact_info = [contactMatch[1].trim()];
+  if (summaryIdx > -1) {
+    const contactText = text.slice(0, summaryIdx).trim();
+    if (contactText) sections.contact_info = [contactText];
   }
 
   // ── Summary ───────────────────────────────────────────
-  const summaryMatch = text.match(
-    /\bSUMMARY\b\s+([\s\S]*?)(?=\bEXPERIENCE\b|\bEDUCATION\b|\bCORE\s+SKILLS\b|\bSKILLS\b|\bACHIEVEMENTS\b|\bPROJECTS\b)/i,
-  );
-  if (summaryMatch) {
-    sections.summary.text = summaryMatch[1].trim();
-    // Summary is prose — treat the whole thing as one bullet
-    sections.summary.bullets = [summaryMatch[1].trim()];
+  if (summaryIdx > -1 && experienceIdx > -1) {
+    const summaryText = sliceSection(summaryIdx, "SUMMARY", experienceIdx);
+    sections.summary.text = summaryText;
+    sections.summary.bullets = summaryText ? [summaryText] : [];
   }
 
   // ── Experience ────────────────────────────────────────
-  const experienceMatch = text.match(
-    /\bEXPERIENCE\b\s+([\s\S]*?)(?=\bCORE\s+SKILLS\b|\bSKILLS\b|\bEDUCATION\b|\bCERTIFICATIONS\b|\bPORTFOLIO\b|\bREFERENCES\b)/i,
-  );
-  if (experienceMatch) {
-    const expText = experienceMatch[1].trim();
+  if (experienceIdx > -1) {
+    const endIdx =
+      skillsIdx > experienceIdx ? skillsIdx : nextSectionAfter(experienceIdx);
+    const expText = sliceSection(experienceIdx, "EXPERIENCE", endIdx);
     sections.experience.text = expText;
-    // Extract all ○ bullets
-    sections.experience.bullets = expText
-      .split(/○\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 20 && !s.match(/^\d+\./)); // exclude numbered role headers
+
+    // Extract all bullet types: ○ ● and newline-prefixed variants
+    const allBullets = expText
+      .split(/\n[○●]\s+/)
+      .map((s) => s.replace(/\n/g, " ").trim())
+      .filter((s) => s.length > 20 && !/^\d+\./.test(s));
+
+    sections.experience.bullets = allBullets;
   }
 
   // ── Skills ────────────────────────────────────────────
-  const skillsMatch = text.match(
-    /\b(?:CORE\s+SKILLS|SKILLS)\b\s*(?:&\s*TECHNOLOGIES)?\s+([\s\S]*?)(?=\bEDUCATION\b|\bCERTIFICATIONS\b|\bPORTFOLIO\b|\bREFERENCES\b|\bINTERESTS\b|$)/i,
-  );
-  if (skillsMatch) {
-    const skillsText = skillsMatch[1].trim();
+  if (skillsIdx > -1) {
+    const endIdx =
+      educationIdx > skillsIdx ? educationIdx : nextSectionAfter(skillsIdx);
+
+    // Skills header can be multi-word — find the actual header text
+    const skillsHeaderWord = (() => {
+      for (const variant of [
+        "CORE SKILLS & TECHNOLOGIES",
+        "CORE SKILLS",
+        "SKILLS",
+      ]) {
+        if (upper.startsWith(variant, skillsIdx)) return variant;
+      }
+      return "SKILLS";
+    })();
+
+    const skillsText = sliceSection(skillsIdx, skillsHeaderWord, endIdx);
     sections.skills.text = skillsText;
-    // Extract ● bullets — each skill category is a bullet
+
+    // Each ● line is a skill category
     const skillBullets = skillsText
-      .split(/●\s+/)
-      .map((s) => s.trim())
+      .split(/\n●\s+/)
+      .map((s) => s.replace(/\n/g, " ").trim())
       .filter((s) => s.length > 5);
+
     sections.skills.bullets =
       skillBullets.length >= 2 ? skillBullets : [skillsText];
   }
 
   // ── Education ─────────────────────────────────────────
-  const educationMatch = text.match(
-    /\bEDUCATION\b\s+([\s\S]*?)(?=\bCERTIFICATIONS\b|\bPORTFOLIO\b|\bREFERENCES\b|\bINTERESTS\b|$)/i,
-  );
-  if (educationMatch) {
-    const eduText = educationMatch[1].trim();
+  if (educationIdx > -1) {
+    const endIdx = nextSectionAfter(educationIdx);
+    const eduText = sliceSection(educationIdx, "EDUCATION", endIdx);
     sections.education.text = eduText;
-    sections.education.bullets = eduText
-      .split(/●\s+/)
-      .map((s) => s.trim())
+
+    const eduBullets = eduText
+      .split(/\n●\s+/)
+      .map((s) => s.replace(/\n/g, " ").trim())
       .filter((s) => s.length > 5);
+
+    sections.education.bullets =
+      eduBullets.length >= 2 ? eduBullets : [eduText];
   }
 
   return sections;

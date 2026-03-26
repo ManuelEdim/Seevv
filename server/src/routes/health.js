@@ -53,28 +53,50 @@ router.get("/ai", async (req, res) => {
 });
 
 // Debug — inspect raw_text and parsed_sections for a CV
+// No auth required — uses service role key directly
 router.get("/cv-debug/:cvId", async (req, res) => {
   try {
-    const { data: cv, error } = await supabase
+    // Use array query instead of single() to avoid "coerce" error
+    const { data: cvs, error } = await supabase
       .from("cvs")
-      .select("raw_text, parsed_sections, file_name, file_type")
-      .eq("id", req.params.cvId)
-      .single();
+      .select(
+        "id, raw_text, parsed_sections, file_name, file_type, user_id, created_at",
+      )
+      .eq("id", req.params.cvId);
 
-    if (error || !cv) {
-      return res.status(404).json({ error: "CV not found." });
+    if (error) {
+      return res.status(500).json({ error: error.message });
     }
 
+    if (!cvs || cvs.length === 0) {
+      // ID not found — list all CVs so we can find the right one
+      const { data: allCvs } = await supabase
+        .from("cvs")
+        .select("id, file_name, file_type, user_id, created_at")
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      return res.status(404).json({
+        error: "CV not found with that ID.",
+        tried_id: req.params.cvId,
+        available_cvs: allCvs || [],
+      });
+    }
+
+    const cv = cvs[0];
     const rawText = cv?.raw_text || "";
 
     res.json({
+      id: cv.id,
       file_name: cv.file_name,
       file_type: cv.file_type,
+      user_id: cv.user_id,
       raw_text_length: rawText.length,
       newline_count: (rawText.match(/\n/g) || []).length,
-      first_500_chars: rawText.slice(0, 500),
-      chars_500_to_1000: rawText.slice(500, 1000),
-      last_200_chars: rawText.slice(-200),
+      first_300_chars: rawText.slice(0, 300),
+      chars_300_to_600: rawText.slice(300, 600),
+      chars_600_to_900: rawText.slice(600, 900),
+      chars_900_to_1200: rawText.slice(900, 1200),
       section_markers: {
         has_summary: /SUMMARY/i.test(rawText),
         has_experience: /EXPERIENCE/i.test(rawText),
@@ -88,13 +110,19 @@ router.get("/cv-debug/:cvId", async (req, res) => {
       chars_around_summary: (() => {
         const idx = rawText.toUpperCase().indexOf("SUMMARY");
         return idx > -1
-          ? rawText.slice(Math.max(0, idx - 20), idx + 100)
+          ? JSON.stringify(rawText.slice(Math.max(0, idx - 10), idx + 120))
           : "NOT FOUND";
       })(),
       chars_around_experience: (() => {
         const idx = rawText.toUpperCase().indexOf("EXPERIENCE");
         return idx > -1
-          ? rawText.slice(Math.max(0, idx - 20), idx + 100)
+          ? JSON.stringify(rawText.slice(Math.max(0, idx - 10), idx + 300))
+          : "NOT FOUND";
+      })(),
+      chars_around_skills: (() => {
+        const idx = rawText.toUpperCase().indexOf("SKILLS");
+        return idx > -1
+          ? JSON.stringify(rawText.slice(Math.max(0, idx - 10), idx + 200))
           : "NOT FOUND";
       })(),
       parsed_sections_keys: Object.keys(cv?.parsed_sections || {}),
@@ -110,10 +138,10 @@ router.get("/cv-debug/:cvId", async (req, res) => {
         Object.entries(cv?.parsed_sections || {}).map(([k, v]) => [
           k,
           typeof v === "object" && v?.text
-            ? v.text.slice(0, 150)
+            ? v.text.slice(0, 200)
             : Array.isArray(v)
               ? v.slice(0, 2)
-              : String(v).slice(0, 150),
+              : String(v).slice(0, 200),
         ]),
       ),
     });

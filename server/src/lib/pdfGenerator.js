@@ -68,16 +68,48 @@ const buildCVHtml = ({
 }) => {
   const accentColor = tone === "bold" ? "#1a1a2e" : "#534ab7";
 
+  // ── Strip name from contact info if it appears there ───
+  // Prevents the name appearing twice (once in header, once in contact block)
+  const cleanContactInfo = (() => {
+    if (!contactInfo) return "";
+    const nameVariants = [
+      fullName?.trim(),
+      fullName?.trim().toUpperCase(),
+    ].filter(Boolean);
+
+    return contactInfo
+      .split("\n")
+      .filter((line) => {
+        const trimmed = line.trim();
+        return !nameVariants.some(
+          (name) =>
+            trimmed === name || trimmed.toUpperCase() === name.toUpperCase(),
+        );
+      })
+      .join("\n")
+      .trim();
+  })();
+
+  // ── Experience HTML ─────────────────────────────────────
   const experienceHtml = (experience || [])
     .map(
       (role) => `
       <div class="role">
         <div class="role-header">
-          <div>
+          <div class="role-left">
             <p class="role-title">${escapeHtml(role.title || "")}</p>
-            ${role.company ? `<p class="role-company">${escapeHtml(role.company)}</p>` : ""}
+            ${
+              role.company
+                ? `<p class="role-company">${escapeHtml(role.company)}${
+                    role.period
+                      ? ` <span class="role-period-inline">· ${escapeHtml(role.period)}</span>`
+                      : ""
+                  }</p>`
+                : role.period
+                  ? `<p class="role-company"><span class="role-period-inline">${escapeHtml(role.period)}</span></p>`
+                  : ""
+            }
           </div>
-          ${role.period ? `<p class="role-period">${escapeHtml(role.period)}</p>` : ""}
         </div>
         <ul class="bullets">
           ${(role.bullets || [])
@@ -169,6 +201,7 @@ const buildCVHtml = ({
       font-size: 9pt;
       color: #555;
       line-height: 1.6;
+      white-space: pre-line;
     }
 
     .contact a {
@@ -217,6 +250,10 @@ const buildCVHtml = ({
       margin-bottom: 4px;
     }
 
+    .role-left {
+      flex: 1;
+    }
+
     .role-title {
       font-family: 'Arial', sans-serif;
       font-size: 10.5pt;
@@ -229,14 +266,13 @@ const buildCVHtml = ({
       font-size: 9.5pt;
       color: #555;
       font-style: italic;
+      margin-top: 1px;
     }
 
-    .role-period {
-      font-family: 'Arial', sans-serif;
-      font-size: 9pt;
+    .role-period-inline {
+      font-style: normal;
       color: #777;
-      white-space: nowrap;
-      margin-left: 8px;
+      font-size: 9pt;
     }
 
     /* ── Bullets ── */
@@ -306,10 +342,10 @@ const buildCVHtml = ({
 <body>
   <div class="page">
 
-    <!-- Header -->
+    <!-- Header — name appears once only -->
     <div class="header">
       <p class="name">${escapeHtml(fullName || "Your Name")}</p>
-      ${contactInfo ? `<p class="contact">${contactInfo}</p>` : ""}
+      ${cleanContactInfo ? `<p class="contact">${escapeHtml(cleanContactInfo)}</p>` : ""}
     </div>
 
     <!-- Summary -->
@@ -341,7 +377,7 @@ const buildCVHtml = ({
       skills && skills.length > 0
         ? `
       <div class="section">
-        <h2 class="section-title">Core Skills & Technologies</h2>
+        <h2 class="section-title">Core Skills &amp; Technologies</h2>
         <ul class="skills-list">
           ${skillsHtml}
         </ul>
@@ -387,3 +423,14 @@ const escapeHtml = (text) => {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 };
+
+// ─── Helper to format dates ───────────────────────────────────
+const formatDate = (date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+  });
+};
+export default {};
