@@ -54,35 +54,6 @@ const generateContent = async (prompt, modelTier = "flash", options = {}) => {
   return text;
 };
 
-// ─── Parse a job description into structured form fields ──
-
-export const parseJobDescription = async (text) => {
-  const prompt = `Extract structured information from this job description and return a JSON object.
-
-Return ONLY this JSON structure, nothing else:
-{
-  "jobTitle": "exact job title from the posting, or null",
-  "companyName": "hiring company name, or null",
-  "location": "city/region/country, or null",
-  "salaryRange": "exact salary text as written (e.g. '£39,424 to £47,779 per annum'), or null",
-  "workType": "remote|hybrid|onsite|null — infer from context if not stated explicitly"
-}
-
-Rules:
-- Return null for any field you cannot confidently determine — never guess
-- jobTitle: use the posted title exactly, not a generic version
-- companyName: the employer, not a recruiter/agency unless that is the employer
-- location: if fully remote with no location stated, set workType to "remote" and location to null
-- salaryRange: copy verbatim from the posting, preserve currency symbols and wording
-- workType: "hybrid" if office days are mentioned, "remote" if fully remote, "onsite" if on-site only
-- Return ONLY valid JSON, no markdown, no explanation
-
-Job description:
-${text.slice(0, 4000)}`;
-
-  return generateContent(prompt, "flash", { json: true, temperature: 0.1 });
-};
-
 // ─── Analyse a job description — Deep Decoder ─────────────
 
 export const analyzeJobDescription = async (jobDescription) => {
@@ -203,7 +174,6 @@ Rules:
 };
 
 // ─── Rewrite all bullets for a section in one batch ───────
-// Much more reliable than rewriting one at a time with low token limits
 
 export const rewriteBulletsInBatch = async (
   bullets,
@@ -217,11 +187,16 @@ export const rewriteBulletsInBatch = async (
     ? `Match this writing voice exactly: "${voiceSample.slice(0, 250)}"`
     : "Use professional, confident, past-tense tone.";
 
-  const bulletList = bullets.map((b, i) => `${i + 1}. ${b.trim()}`).join("\n");
+  // Include word count so AI matches original length
+  const bulletList = bullets
+    .map(
+      (b, i) => `${i + 1}. ${b.trim()} [${b.trim().split(/\s+/).length} words]`,
+    )
+    .join("\n");
 
   const prompt = `You are an expert CV writer. Rewrite these ${sectionType} bullet points to be impact-first and tailored to the job description.
 
-ORIGINAL BULLETS:
+ORIGINAL BULLETS (word count shown in brackets):
 ${bulletList}
 
 JOB DESCRIPTION CONTEXT:
@@ -231,10 +206,10 @@ ${voiceInstruction}
 
 RULES:
 - Rewrite EVERY bullet — return exactly ${bullets.length} bullets
+- Each rewritten bullet MUST be within 20% of the original word count shown in brackets
 - Each bullet MUST be a complete grammatically correct sentence — never cut off mid-word
 - Start each with a strong past-tense action verb
 - Add measurable outcomes where logical (%, numbers, scale)
-- Keep each bullet between 15 and 40 words
 - Sound human and specific, not generic AI
 - Preserve all factual details — never fabricate
 
@@ -248,13 +223,11 @@ Return ONLY a numbered list in exactly this format with no extra text:
     maxTokens: 2000,
   });
 
-  // Parse the numbered list back into an array
   const lines = result
     .split("\n")
     .map((l) => l.replace(/^\d+\.\s*/, "").trim())
     .filter((l) => l.length > 20);
 
-  // If we got back roughly the right number, use them
   if (lines.length >= Math.ceil(bullets.length * 0.7)) {
     return lines.slice(0, bullets.length);
   }
@@ -277,6 +250,11 @@ export const rewriteCVSection = async (
     ? `Match this writing voice exactly: "${voiceSample.slice(0, 300)}"`
     : "Use professional, confident tone.";
 
+  // Match original length
+  const originalWordCount = content.trim().split(/\s+/).length;
+  const minWords = Math.max(50, Math.floor(originalWordCount * 0.85));
+  const maxWords = Math.ceil(originalWordCount * 1.15);
+
   const prompt = `You are an expert CV writer. Rewrite this ${sectionType} section to be tailored for the job.
 
 Original content:
@@ -288,10 +266,11 @@ ${jobDescription.slice(0, 800)}
 ${voiceInstruction}
 
 Rules:
+- Write between ${minWords} and ${maxWords} words — match the original length closely
 - Preserve all factual information — never fabricate or exaggerate
-- Make every line impact-driven
+- Make every line impact-driven and relevant to the job description
 - Sound like a human wrote it, not AI
-- Return the rewritten section as plain text only`;
+- Return the rewritten section as plain text only — no bullet points, no headers`;
 
   return generateContent(prompt, "pro", {
     temperature: 0.6,
@@ -428,9 +407,15 @@ Score (0-100):`;
   }
 };
 
+// ─── Parse a job description (alias for analyzeJobDescription) ───
+
+export const parseJobDescription = async (jobDescription) => {
+  return analyzeJobDescription(jobDescription);
+};
+
 export default {
-  parseJobDescription,
   analyzeJobDescription,
+  parseJobDescription,
   extractKeywords,
   rewriteBullet,
   rewriteSingleBullet,

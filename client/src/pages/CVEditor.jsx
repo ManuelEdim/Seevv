@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Badge, Spinner, Card } from "@/components/ui";
 import useCVEditor from "@/hooks/useCVEditor";
@@ -22,81 +22,120 @@ const rewriteLabelConfig = {
   },
 };
 
-// ─── Calculate pending decisions across all sections ──────
+// ─── Count total reviewable bullets ──────────────────────
 
-const getTotalPending = (tc) => {
-  let pending = 0;
+const countTotalBullets = (tc) => {
   let total = 0;
 
-  // Summary
-  if (tc.summary && tc.summary.rewrite_level !== "none") {
-    const decisions = tc.summary.bullet_decisions || {};
+  if (tc.summary?.rewrite_level !== "none") {
     const bullets =
-      Array.isArray(tc.summary.bullets_tailored) &&
+      Array.isArray(tc.summary?.bullets_tailored) &&
       tc.summary.bullets_tailored.length > 0
         ? tc.summary.bullets_tailored
-        : [tc.summary.tailored].filter(Boolean);
-    bullets.forEach((_, i) => {
-      total++;
-      if (decisions[i] === undefined) pending++;
-    });
+        : [tc.summary?.tailored].filter(Boolean);
+    total += bullets.length;
   }
 
-  // Experience roles
-  if (tc.experience && tc.experience.rewrite_level !== "none") {
+  if (tc.experience?.rewrite_level !== "none") {
     const roles =
-      tc.experience.roles_tailored || tc.experience.roles_original || [];
+      tc.experience?.roles_tailored || tc.experience?.roles_original || [];
     roles.forEach((role) => {
-      const decisions = role.bullet_decisions || {};
-      (role.bullets || []).forEach((_, i) => {
-        total++;
-        if (decisions[i] === undefined) pending++;
-      });
+      total += (role.bullets || []).length;
     });
-
-    // Fallback flat bullets if no roles
     if (roles.length === 0) {
-      const decisions = tc.experience.bullet_decisions || {};
-      (tc.experience.bullets_tailored || []).forEach((_, i) => {
-        total++;
-        if (decisions[i] === undefined) pending++;
-      });
+      total += (tc.experience?.bullets_tailored || []).length;
     }
   }
 
-  // Skills
-  if (tc.skills && tc.skills.rewrite_level !== "none") {
-    const decisions = tc.skills.bullet_decisions || {};
+  if (tc.skills?.rewrite_level !== "none") {
     const bullets =
-      Array.isArray(tc.skills.bullets_tailored) &&
+      Array.isArray(tc.skills?.bullets_tailored) &&
       tc.skills.bullets_tailored.length > 0
         ? tc.skills.bullets_tailored
-        : [tc.skills.tailored].filter(Boolean);
-    bullets.forEach((_, i) => {
-      total++;
-      if (decisions[i] === undefined) pending++;
-    });
+        : [tc.skills?.tailored].filter(Boolean);
+    total += bullets.length;
   }
 
-  // Achievements
-  if (tc.achievements && tc.achievements.rewrite_level !== "none") {
-    const decisions = tc.achievements.bullet_decisions || {};
-    (tc.achievements.bullets_tailored || []).forEach((_, i) => {
-      total++;
-      if (decisions[i] === undefined) pending++;
-    });
+  if (tc.achievements?.rewrite_level !== "none") {
+    total += (tc.achievements?.bullets_tailored || []).length;
   }
 
-  // Projects
-  if (tc.projects && tc.projects.rewrite_level !== "none") {
-    const decisions = tc.projects.bullet_decisions || {};
-    (tc.projects.bullets_tailored || []).forEach((_, i) => {
-      total++;
-      if (decisions[i] === undefined) pending++;
-    });
+  if (tc.projects?.rewrite_level !== "none") {
+    total += (tc.projects?.bullets_tailored || []).length;
   }
 
-  return { pending, total };
+  return total;
+};
+
+// ─── Accordion wrapper ────────────────────────────────────
+
+const Accordion = ({
+  title,
+  badge,
+  defaultOpen = false,
+  children,
+  pendingCount = 0,
+}) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="border border-gray-100 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setIsOpen((p) => !p)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors cursor-pointer"
+      >
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest">
+            {title}
+          </h3>
+          {badge && (
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full border ${badge.color}`}
+            >
+              {badge.label}
+            </span>
+          )}
+          {pendingCount > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 border border-amber-100 text-amber-700">
+              {pendingCount} pending
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {pendingCount === 0 && (
+            <span className="text-xs text-teal-600 font-medium">✓ Done</span>
+          )}
+          {/* Click to open hint — only shown when closed */}
+          {!isOpen && (
+            <span className="text-xs text-gray-400 hidden sm:inline">
+              click to open
+            </span>
+          )}
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`text-gray-400 transition-transform duration-200 ${
+              isOpen ? "rotate-180" : ""
+            }`}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="px-4 pb-4 pt-2 border-t border-gray-50 bg-white">
+          {children}
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ─── Single bullet with accept / reject ──────────────────
@@ -213,9 +252,7 @@ const RoleBlock = ({ role, onDecisionChange, sectionKey, roleIndex }) => {
     setBulletStates((prev) => {
       const next = [...prev];
       next[i] = value;
-      if (onDecisionChange) {
-        onDecisionChange(sectionKey, roleIndex, i, value);
-      }
+      if (onDecisionChange) onDecisionChange(sectionKey, roleIndex, i, value);
       return next;
     });
   };
@@ -223,12 +260,19 @@ const RoleBlock = ({ role, onDecisionChange, sectionKey, roleIndex }) => {
   return (
     <div className="mb-5">
       <div className="flex items-start justify-between gap-2 mb-0.5">
-        <p className="text-sm font-semibold text-gray-900">{role.title}</p>
+        <div>
+          <p className="text-sm font-semibold text-gray-900">{role.title}</p>
+          {role.company && (
+            <p className="text-xs text-gray-500 mt-0.5">
+              {role.company}
+              {role.period ? ` · ${role.period}` : ""}
+            </p>
+          )}
+        </div>
         {pendingCount > 0 && (
           <button
             onClick={() => {
-              const allAccepted = bullets.map(() => true);
-              setBulletStates(allAccepted);
+              setBulletStates(bullets.map(() => true));
               if (onDecisionChange) {
                 bullets.forEach((_, i) =>
                   onDecisionChange(sectionKey, roleIndex, i, true),
@@ -242,11 +286,7 @@ const RoleBlock = ({ role, onDecisionChange, sectionKey, roleIndex }) => {
         )}
       </div>
 
-      {role.company && (
-        <p className="text-xs text-gray-500 mb-2">{role.company}</p>
-      )}
-
-      <ul className="space-y-1 pl-0">
+      <ul className="space-y-1 pl-0 mt-2">
         {bullets.map((bullet, i) => (
           <BulletRow
             key={i}
@@ -316,22 +356,17 @@ const GenericSection = ({ sectionKey, label, section, onDecisionChange }) => {
 
   if (bullets.length === 0) return null;
 
+  const badge = rewriteLabelConfig[rewriteLevel];
+
   return (
-    <div className="mb-5">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest">
-            {label}
-          </h3>
-          {rewriteLabelConfig[rewriteLevel] && (
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full border ${rewriteLabelConfig[rewriteLevel].color}`}
-            >
-              {rewriteLabelConfig[rewriteLevel].label}
-            </span>
-          )}
-        </div>
-        {pendingCount > 0 && (
+    <Accordion
+      title={label}
+      badge={badge}
+      defaultOpen={sectionKey === "summary"}
+      pendingCount={autoAccepted ? 0 : pendingCount}
+    >
+      {pendingCount > 0 && (
+        <div className="flex justify-end mb-2">
           <button
             onClick={() => {
               setBulletStates(bullets.map(() => true));
@@ -345,10 +380,8 @@ const GenericSection = ({ sectionKey, label, section, onDecisionChange }) => {
           >
             Accept all
           </button>
-        )}
-      </div>
-      <div className="h-px bg-gray-200 mb-3" />
-
+        </div>
+      )}
       <ul className="space-y-1 pl-0">
         {bullets.map((bullet, i) => (
           <BulletRow
@@ -362,7 +395,7 @@ const GenericSection = ({ sectionKey, label, section, onDecisionChange }) => {
           />
         ))}
       </ul>
-    </div>
+    </Accordion>
   );
 };
 
@@ -371,6 +404,33 @@ const GenericSection = ({ sectionKey, label, section, onDecisionChange }) => {
 const ExperienceSection = ({ section, onDecisionChange }) => {
   const rewriteLevel = section.rewrite_level || "full";
   const roles = section.roles_tailored || section.roles_original || [];
+
+  // Track decisions made this session so totalPending stays live.
+  // role.bullet_decisions (from props) only reflects what was saved to DB
+  // before this page load — it never mutates locally.
+  const [sessionDecisions, setSessionDecisions] = useState({});
+
+  const totalPending = roles.reduce((sum, role, ri) => {
+    if (role.rewrite_level === "none") return sum;
+    const saved = role.bullet_decisions || {};
+    return (
+      sum +
+      (role.bullets || []).filter((_, i) => {
+        if (sessionDecisions[`${ri}_${i}`] !== undefined) return false;
+        return saved[i] === undefined;
+      }).length
+    );
+  }, 0);
+
+  const handleRoleDecision = (sectionKey, roleIndex, bulletIndex, accepted) => {
+    setSessionDecisions((prev) => ({
+      ...prev,
+      [`${roleIndex}_${bulletIndex}`]: accepted,
+    }));
+    if (onDecisionChange) onDecisionChange(sectionKey, roleIndex, bulletIndex, accepted);
+  };
+
+  const badge = rewriteLabelConfig[rewriteLevel];
 
   if (roles.length === 0) {
     return (
@@ -384,30 +444,22 @@ const ExperienceSection = ({ section, onDecisionChange }) => {
   }
 
   return (
-    <div className="mb-5">
-      <div className="flex items-center gap-2 mb-2">
-        <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest">
-          Experience
-        </h3>
-        {rewriteLabelConfig[rewriteLevel] && (
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full border ${rewriteLabelConfig[rewriteLevel].color}`}
-          >
-            {rewriteLabelConfig[rewriteLevel].label}
-          </span>
-        )}
-      </div>
-      <div className="h-px bg-gray-200 mb-3" />
+    <Accordion
+      title="Experience"
+      badge={badge}
+      defaultOpen={false}
+      pendingCount={totalPending}
+    >
       {roles.map((role, i) => (
         <RoleBlock
           key={i}
           role={role}
           roleIndex={i}
           sectionKey="experience"
-          onDecisionChange={onDecisionChange}
+          onDecisionChange={handleRoleDecision}
         />
       ))}
-    </div>
+    </Accordion>
   );
 };
 
@@ -476,6 +528,8 @@ const CVEditor = () => {
   const [activePanel, setActivePanel] = useState("editor");
   const [isExporting, setIsExporting] = useState(false);
   const [isSavingDecisions, setIsSavingDecisions] = useState(false);
+  const [localDecisions, setLocalDecisions] = useState({});
+  const patchTimeoutRef = useRef(null);
 
   const {
     version,
@@ -488,59 +542,100 @@ const CVEditor = () => {
     updateTone,
   } = useCVEditor();
 
-  // Save accept/reject decision back to Supabase immediately
+  // Seed localDecisions from saved bullet_decisions so the progress bar
+  // and export-ready state are correct on page load / re-load.
+  useEffect(() => {
+    if (!version?.tailored_content) return;
+    const tc = version.tailored_content;
+    const decisions = {};
+
+    ["summary", "skills", "achievements", "projects"].forEach((key) => {
+      if (tc[key]?.rewrite_level !== "none" && tc[key]?.bullet_decisions) {
+        Object.entries(tc[key].bullet_decisions).forEach(([idx, val]) => {
+          decisions[`${key}_${idx}`] = val;
+        });
+      }
+    });
+
+    if (tc.experience?.rewrite_level !== "none") {
+      const roles =
+        tc.experience?.roles_tailored || tc.experience?.roles_original || [];
+      if (roles.length > 0) {
+        roles.forEach((role, ri) => {
+          Object.entries(role.bullet_decisions || {}).forEach(([idx, val]) => {
+            decisions[`experience_${ri}_${idx}`] = val;
+          });
+        });
+      } else {
+        Object.entries(tc.experience?.bullet_decisions || {}).forEach(
+          ([idx, val]) => {
+            decisions[`experience_${idx}`] = val;
+          },
+        );
+      }
+    }
+
+    setLocalDecisions(decisions);
+  }, [version?.id, version?.tailored_content]);
+
   const handleDecisionChange = useCallback(
     async (sectionKey, roleIndex, bulletIndex, accepted) => {
       if (!version?.id) return;
-      setIsSavingDecisions(true);
 
-      try {
-        const tc = JSON.parse(JSON.stringify(version.tailored_content || {}));
+      const decisionKey =
+        roleIndex !== null
+          ? `${sectionKey}_${roleIndex}_${bulletIndex}`
+          : `${sectionKey}_${bulletIndex}`;
 
-        if (sectionKey === "experience" && roleIndex !== null) {
-          const roles =
-            tc.experience?.roles_tailored ||
-            tc.experience?.roles_original ||
-            [];
-          if (roles[roleIndex]) {
-            if (!roles[roleIndex].bullet_decisions) {
-              roles[roleIndex].bullet_decisions = {};
-            }
-            roles[roleIndex].bullet_decisions[bulletIndex] = accepted;
-            if (tc.experience.roles_tailored?.[roleIndex]) {
-              tc.experience.roles_tailored[roleIndex].bullet_decisions =
-                roles[roleIndex].bullet_decisions;
-            }
+      setLocalDecisions((prev) => ({ ...prev, [decisionKey]: accepted }));
+
+      const tc = JSON.parse(JSON.stringify(version.tailored_content || {}));
+
+      if (sectionKey === "experience" && roleIndex !== null) {
+        const roles =
+          tc.experience?.roles_tailored || tc.experience?.roles_original || [];
+        if (roles[roleIndex]) {
+          if (!roles[roleIndex].bullet_decisions)
+            roles[roleIndex].bullet_decisions = {};
+          roles[roleIndex].bullet_decisions[bulletIndex] = accepted;
+          if (tc.experience.roles_tailored?.[roleIndex]) {
+            tc.experience.roles_tailored[roleIndex].bullet_decisions =
+              roles[roleIndex].bullet_decisions;
           }
-        } else {
-          if (!tc[sectionKey]) tc[sectionKey] = {};
-          if (!tc[sectionKey].bullet_decisions) {
-            tc[sectionKey].bullet_decisions = {};
-          }
-          tc[sectionKey].bullet_decisions[bulletIndex] = accepted;
         }
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (!session?.access_token) return;
-
-        await fetch(
-          `${import.meta.env.VITE_API_URL}/cv/version/${version.id}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({ tailored_content: tc }),
-          },
-        );
-      } catch (err) {
-        console.error("Failed to save decision:", err.message);
-      } finally {
-        setIsSavingDecisions(false);
+      } else {
+        if (!tc[sectionKey]) tc[sectionKey] = {};
+        if (!tc[sectionKey].bullet_decisions)
+          tc[sectionKey].bullet_decisions = {};
+        tc[sectionKey].bullet_decisions[bulletIndex] = accepted;
       }
+
+      if (patchTimeoutRef.current) clearTimeout(patchTimeoutRef.current);
+      patchTimeoutRef.current = setTimeout(async () => {
+        setIsSavingDecisions(true);
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (!session?.access_token) return;
+
+          await fetch(
+            `${import.meta.env.VITE_API_URL}/cv/version/${version.id}`,
+            {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ tailored_content: tc }),
+            },
+          );
+        } catch (err) {
+          console.error("Failed to save decision:", err.message);
+        } finally {
+          setIsSavingDecisions(false);
+        }
+      }, 600);
     },
     [version],
   );
@@ -635,10 +730,10 @@ const CVEditor = () => {
     (k) => !["match_score", "blind_spots", "tone", "contact_info"].includes(k),
   );
 
-  // ── Export lock logic ─────────────────────────────────
-  const { pending: pendingDecisions, total: totalDecisions } =
-    getTotalPending(tc);
-  const exportReady = pendingDecisions === 0;
+  const totalDecisions = countTotalBullets(tc);
+  const localDecisionCount = Object.keys(localDecisions).length;
+  const pendingDecisions = Math.max(0, totalDecisions - localDecisionCount);
+  const exportReady = totalDecisions > 0 && pendingDecisions === 0;
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 pb-10">
@@ -710,7 +805,6 @@ const CVEditor = () => {
             </Button>
           )}
 
-          {/* Export PDF — locked until all reviewed */}
           <Button
             variant="outline"
             size="sm"
@@ -780,17 +874,18 @@ const CVEditor = () => {
               </div>
             </Card>
           ) : (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-6 lg:p-8">
+            <div className="space-y-2">
               {/* Contact info note */}
               {tc.contact_info && tc.contact_info.length > 0 && (
-                <div className="text-center mb-6 pb-6 border-b border-gray-100">
+                <div className="bg-white border border-gray-100 rounded-xl px-4 py-3 text-center">
                   <p className="text-xs text-gray-400 italic">
-                    Contact info from your original CV
+                    Contact info from your original CV will appear in the
+                    exported PDF
                   </p>
                 </div>
               )}
 
-              {/* Summary */}
+              {/* Summary — open by default */}
               {tc.summary && (
                 <GenericSection
                   sectionKey="summary"
@@ -800,7 +895,7 @@ const CVEditor = () => {
                 />
               )}
 
-              {/* Experience */}
+              {/* Experience — closed by default */}
               {tc.experience && (
                 <ExperienceSection
                   section={tc.experience}
@@ -808,7 +903,7 @@ const CVEditor = () => {
                 />
               )}
 
-              {/* Skills */}
+              {/* Skills — closed by default */}
               {tc.skills && (
                 <GenericSection
                   sectionKey="skills"
@@ -818,7 +913,7 @@ const CVEditor = () => {
                 />
               )}
 
-              {/* Achievements */}
+              {/* Achievements — closed by default */}
               {tc.achievements && (
                 <GenericSection
                   sectionKey="achievements"
@@ -828,7 +923,7 @@ const CVEditor = () => {
                 />
               )}
 
-              {/* Projects */}
+              {/* Projects — closed by default */}
               {tc.projects && (
                 <GenericSection
                   sectionKey="projects"
@@ -838,25 +933,25 @@ const CVEditor = () => {
                 />
               )}
 
-              {/* Education — always kept */}
+              {/* Education — closed by default, always kept */}
               {tc.education && (
-                <div className="mb-5">
-                  <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-2">
-                    Education
-                  </h3>
-                  <div className="h-px bg-gray-200 mb-3" />
+                <Accordion
+                  title="Education"
+                  defaultOpen={false}
+                  pendingCount={0}
+                >
                   <p className="text-xs text-gray-500 italic mb-2">
                     ✓ Kept from your original CV
                   </p>
                   <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
                     {tc.education.original}
                   </div>
-                </div>
+                </Accordion>
               )}
             </div>
           )}
 
-          {/* Progress banner + bottom actions */}
+          {/* Progress banner */}
           {!exportReady && totalDecisions > 0 && (
             <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
               <div className="flex items-center justify-between mb-2">
@@ -867,11 +962,8 @@ const CVEditor = () => {
                   still need review before you can export.
                 </p>
                 <span className="text-xs text-amber-600 font-medium">
-                  {Math.round(
-                    ((totalDecisions - pendingDecisions) / totalDecisions) *
-                      100,
-                  )}
-                  % done
+                  {Math.round((localDecisionCount / totalDecisions) * 100)}%
+                  done
                 </span>
               </div>
               <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden">
@@ -879,8 +971,7 @@ const CVEditor = () => {
                   className="h-full bg-amber-500 rounded-full transition-all duration-300"
                   style={{
                     width: `${Math.round(
-                      ((totalDecisions - pendingDecisions) / totalDecisions) *
-                        100,
+                      (localDecisionCount / totalDecisions) * 100,
                     )}%`,
                   }}
                 />
@@ -888,6 +979,7 @@ const CVEditor = () => {
             </div>
           )}
 
+          {/* Bottom actions */}
           <div className="flex gap-3">
             <Button
               variant="primary"

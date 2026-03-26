@@ -1,7 +1,5 @@
 import puppeteer from "puppeteer";
 
-// ─── Generate a CV PDF from structured content ────────────
-
 export const generateCVPdf = async (cvData) => {
   const {
     fullName,
@@ -39,10 +37,10 @@ export const generateCVPdf = async (cvData) => {
     const pdf = await page.pdf({
       format: "A4",
       margin: {
-        top: "20mm",
-        right: "20mm",
-        bottom: "20mm",
-        left: "20mm",
+        top: "14mm",
+        right: "16mm",
+        bottom: "14mm",
+        left: "16mm",
       },
       printBackground: true,
     });
@@ -52,8 +50,6 @@ export const generateCVPdf = async (cvData) => {
     await browser.close();
   }
 };
-
-// ─── Build the CV HTML template ───────────────────────────
 
 const buildCVHtml = ({
   fullName,
@@ -68,29 +64,43 @@ const buildCVHtml = ({
 }) => {
   const accentColor = tone === "bold" ? "#1a1a2e" : "#534ab7";
 
-  // ── Strip name from contact info if it appears there ───
-  // Prevents the name appearing twice (once in header, once in contact block)
+  // ── Strip name from contact info ───────────────────
   const cleanContactInfo = (() => {
     if (!contactInfo) return "";
-    const nameVariants = [
-      fullName?.trim(),
-      fullName?.trim().toUpperCase(),
-    ].filter(Boolean);
+
+    const nameLower = (fullName || "").trim().toLowerCase();
+    const nameParts = nameLower.split(/\s+/).filter(Boolean);
 
     return contactInfo
       .split("\n")
       .filter((line) => {
-        const trimmed = line.trim();
-        return !nameVariants.some(
-          (name) =>
-            trimmed === name || trimmed.toUpperCase() === name.toUpperCase(),
-        );
+        const lineLower = line.trim().toLowerCase();
+        if (!lineLower) return false;
+        if (lineLower === nameLower) return false;
+
+        const lineWords = lineLower
+          .replace(/[^a-z\s]/g, "")
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean);
+
+        if (lineWords.length >= 2) {
+          const allAreNameParts = lineWords.every((word) =>
+            nameParts.some(
+              (part) =>
+                part === word || part.includes(word) || word.includes(part),
+            ),
+          );
+          if (allAreNameParts) return false;
+        }
+
+        return true;
       })
       .join("\n")
       .trim();
   })();
 
-  // ── Experience HTML ─────────────────────────────────────
+  // ── Experience HTML ─────────────────────────────────
   const experienceHtml = (experience || [])
     .map(
       (role) => `
@@ -168,9 +178,9 @@ const buildCVHtml = ({
     }
 
     body {
-      font-family: 'Georgia', 'Times New Roman', serif;
-      font-size: 10.5pt;
-      line-height: 1.5;
+      font-family: 'Arial', sans-serif;
+      font-size: 9.5pt;
+      line-height: 1.4;
       color: #1a1a1a;
       background: #ffffff;
     }
@@ -182,61 +192,53 @@ const buildCVHtml = ({
     /* ── Header ── */
     .header {
       text-align: center;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
       border-bottom: 2px solid ${accentColor};
     }
 
     .name {
-      font-family: 'Arial', sans-serif;
-      font-size: 22pt;
+      font-size: 18pt;
       font-weight: 700;
       color: ${accentColor};
       letter-spacing: 0.5px;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .contact {
-      font-family: 'Arial', sans-serif;
-      font-size: 9pt;
+      font-size: 8pt;
       color: #555;
-      line-height: 1.6;
+      line-height: 1.4;
       white-space: pre-line;
-    }
-
-    .contact a {
-      color: ${accentColor};
-      text-decoration: none;
     }
 
     /* ── Sections ── */
     .section {
-      margin-bottom: 14px;
+      margin-bottom: 7px;
     }
 
     .section-title {
-      font-family: 'Arial', sans-serif;
-      font-size: 10pt;
+      font-size: 9pt;
       font-weight: 700;
       color: ${accentColor};
       text-transform: uppercase;
-      letter-spacing: 1.2px;
+      letter-spacing: 1px;
       border-bottom: 1px solid ${accentColor};
-      padding-bottom: 2px;
-      margin-bottom: 8px;
+      padding-bottom: 1px;
+      margin-bottom: 5px;
     }
 
     /* ── Summary ── */
     .summary-text {
-      font-size: 10.5pt;
-      line-height: 1.6;
+      font-size: 9.5pt;
+      line-height: 1.45;
       color: #333;
       text-align: justify;
     }
 
     /* ── Experience ── */
     .role {
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
 
     .role:last-child {
@@ -247,7 +249,7 @@ const buildCVHtml = ({
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .role-left {
@@ -255,15 +257,13 @@ const buildCVHtml = ({
     }
 
     .role-title {
-      font-family: 'Arial', sans-serif;
-      font-size: 10.5pt;
+      font-size: 9.5pt;
       font-weight: 700;
       color: #1a1a1a;
     }
 
     .role-company {
-      font-family: 'Arial', sans-serif;
-      font-size: 9.5pt;
+      font-size: 8.5pt;
       color: #555;
       font-style: italic;
       margin-top: 1px;
@@ -272,20 +272,20 @@ const buildCVHtml = ({
     .role-period-inline {
       font-style: normal;
       color: #777;
-      font-size: 9pt;
+      font-size: 8pt;
     }
 
     /* ── Bullets ── */
     .bullets {
-      margin-left: 16px;
-      margin-top: 4px;
+      margin-left: 12px;
+      margin-top: 2px;
     }
 
     .bullets li {
-      font-size: 10pt;
-      line-height: 1.5;
+      font-size: 9pt;
+      line-height: 1.4;
       color: #333;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
 
     /* ── Skills ── */
@@ -296,17 +296,16 @@ const buildCVHtml = ({
     }
 
     .skills-list li {
-      font-size: 10pt;
-      line-height: 1.5;
+      font-size: 9pt;
+      line-height: 1.4;
       color: #333;
-      margin-bottom: 2px;
-      padding-left: 0;
+      margin-bottom: 1px;
     }
 
     .skills-list li::before {
       content: "● ";
       color: ${accentColor};
-      font-size: 8pt;
+      font-size: 7pt;
     }
 
     /* ── Education ── */
@@ -317,24 +316,20 @@ const buildCVHtml = ({
     }
 
     .education-list li {
-      font-size: 10pt;
-      line-height: 1.5;
+      font-size: 9pt;
+      line-height: 1.4;
       color: #333;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
 
     .education-list li::before {
       content: "● ";
       color: ${accentColor};
-      font-size: 8pt;
+      font-size: 7pt;
     }
 
     /* ── Page break control ── */
     .role {
-      page-break-inside: avoid;
-    }
-
-    .section {
       page-break-inside: avoid;
     }
   </style>
@@ -354,7 +349,7 @@ const buildCVHtml = ({
         ? `
       <div class="section">
         <h2 class="section-title">Summary</h2>
-        <p class="summary-text">${escapeHtml(summary)}</p>
+        <p class="summary-text">${escapeHtml(summary.trim())}</p>
       </div>
     `
         : ""
@@ -423,14 +418,3 @@ const escapeHtml = (text) => {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 };
-
-// ─── Helper to format dates ───────────────────────────────────
-const formatDate = (date) => {
-  if (!date) return "";
-  const d = new Date(date);
-  return d.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-  });
-};
-export default {};

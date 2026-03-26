@@ -6,7 +6,6 @@ export const exportCVAsPdf = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // Get CV version with all related data
     const { data: version, error: versionError } = await supabase
       .from("cv_versions")
       .select(
@@ -26,32 +25,41 @@ export const exportCVAsPdf = async (req, res) => {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("full_name, avatar_url")
+      .select("full_name")
       .eq("id", userId)
       .single();
 
     const tc = version.tailored_content || {};
 
     // ── Summary ───────────────────────────────────────
-    // Respects bullet_decisions[0] if set
     const summary = (() => {
       const s = tc.summary;
       if (!s) return "";
 
-      const decisions = s.bullet_decisions || {};
-
-      // If first bullet explicitly rejected — use original
-      if (decisions[0] === false) {
-        const orig = s.original || "";
-        return orig.split("\n").filter((l) => l.trim().length > 20)[0] || orig;
+      if (s.accepted === true) {
+        return (s.tailored || s.original || "").trim();
       }
 
-      const text = s.tailored || s.original || "";
-      return text.split("\n").filter((l) => l.trim().length > 20)[0] || text;
+      const decisions = s.bullet_decisions || {};
+      const tailoredBullets =
+        Array.isArray(s.bullets_tailored) && s.bullets_tailored.length > 0
+          ? s.bullets_tailored
+          : [s.tailored].filter(Boolean);
+      const originalBullets =
+        Array.isArray(s.bullets_original) && s.bullets_original.length > 0
+          ? s.bullets_original
+          : [s.original].filter(Boolean);
+
+      const resolvedBullets = tailoredBullets
+        .map((bullet, i) =>
+          decisions[i] === false ? originalBullets[i] || bullet : bullet,
+        )
+        .filter((b) => b && b.trim().length > 10);
+
+      return resolvedBullets.join(" ").trim();
     })();
 
     // ── Experience ────────────────────────────────────
-    // Respects bullet_decisions per role
     const experience = (() => {
       const exp = tc.experience;
       if (!exp) return [];
@@ -66,14 +74,9 @@ export const exportCVAsPdf = async (req, res) => {
             const originalBullets = role.bullets_original || tailoredBullets;
 
             const bullets = tailoredBullets
-              .map((bullet, i) => {
-                // Rejected — fall back to original bullet
-                if (decisions[i] === false) {
-                  return originalBullets[i] || bullet;
-                }
-                // Accepted or undecided — use tailored
-                return bullet;
-              })
+              .map((bullet, i) =>
+                decisions[i] === false ? originalBullets[i] || bullet : bullet,
+              )
               .filter((b) => b && b.trim().length > 10);
 
             return {
@@ -86,15 +89,12 @@ export const exportCVAsPdf = async (req, res) => {
           .filter((role) => role.bullets.length > 0);
       }
 
-      // Fallback — flat bullets with decisions
       const decisions = exp.bullet_decisions || {};
       const tailoredBullets = exp.bullets_tailored || [];
       const originalBullets = exp.bullets_original || tailoredBullets;
 
       const bullets = tailoredBullets
-        .map((bullet, i) =>
-          decisions[i] === false ? originalBullets[i] || bullet : bullet,
-        )
+        .map((b, i) => (decisions[i] === false ? originalBullets[i] || b : b))
         .filter((b) => b && b.trim().length > 10);
 
       return bullets.length > 0
@@ -103,14 +103,12 @@ export const exportCVAsPdf = async (req, res) => {
     })();
 
     // ── Skills ────────────────────────────────────────
-    // Respects bullet_decisions per skill line
     const skills = (() => {
       const s = tc.skills;
       if (!s) return [];
 
       const decisions = s.bullet_decisions || {};
 
-      // Prefer bullets_tailored — each is a full skill category line
       if (Array.isArray(s.bullets_tailored) && s.bullets_tailored.length > 0) {
         const originalBullets = s.bullets_original || s.bullets_tailored;
         return s.bullets_tailored
@@ -120,8 +118,7 @@ export const exportCVAsPdf = async (req, res) => {
           .filter((b) => b && b.trim().length > 5);
       }
 
-      // Fallback — split tailored text
-      const text = Object.keys(decisions).some((k) => decisions[k] === false)
+      const text = Object.values(decisions).some((v) => v === false)
         ? s.original || ""
         : s.tailored || s.original || "";
 
@@ -131,14 +128,12 @@ export const exportCVAsPdf = async (req, res) => {
         .filter((l) => l.length > 5);
     })();
 
-    // ── Education ─────────────────────────────────────
-    // Always kept from original
+    // ── Education — always from original ──────────────
     const education = (() => {
       const e = tc.education;
       if (!e) return [];
       const text = e.original || "";
 
-      // Try ● split first
       const byDot = text
         .split(/●\s+/)
         .map((s) => s.trim())
@@ -197,12 +192,7 @@ export const exportCVAsPdf = async (req, res) => {
     const contactInfo = (() => {
       const stored = tc.contact_info;
       if (Array.isArray(stored) && stored.length > 0) {
-        return (
-          stored[0]
-            ?.split("|")
-            .map((s) => s.trim())
-            .join(" | ") || ""
-        );
+        return stored[0] || "";
       }
       return "";
     })();
@@ -220,10 +210,18 @@ export const exportCVAsPdf = async (req, res) => {
       tone: version.tone || "balanced",
     });
 
-    // ── Send as download ──────────────────────────────
-    const fileName = `${(profile?.full_name || "CV").replace(/\s+/g, "_")}_${
-      version.job_target?.job_title?.replace(/\s+/g, "_") || "Tailored"
-    }.pdf`;
+    // ── Filename: "Software Engineer (Stripe) - Emmanuel Okang Edim.pdf" ──
+    const jobTitle = (version.job_target?.job_title || "Tailored CV")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const companyName = (version.job_target?.company_name || "").trim();
+
+    const jobPart = companyName ? `${jobTitle} (${companyName})` : jobTitle;
+
+    const userName = (profile?.full_name || "").trim();
+
+    const fileName = `${jobPart}${userName ? ` - ${userName}` : ""}.pdf`;
 
     res.set({
       "Content-Type": "application/pdf",
