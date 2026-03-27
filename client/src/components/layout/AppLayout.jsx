@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
+import OnboardingGuide from "@/components/OnboardingGuide";
 
 const AppLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -21,6 +22,9 @@ const AppLayout = ({ children }) => {
         <TopBar onMenuClick={() => setSidebarOpen((prev) => !prev)} />
         <main className="flex-1 p-4 lg:p-6">{children}</main>
       </div>
+
+      {/* Onboarding guide — shown once on first login, bottom-left */}
+      <OnboardingGuide />
     </div>
   );
 };

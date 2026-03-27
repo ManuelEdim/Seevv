@@ -33,6 +33,257 @@ const signupSchema = z
     path: ["confirmPassword"],
   });
 
+// ─── Left panel illustration ──────────────────────────────
+
+const JourneyIllustration = () => (
+  <svg
+    viewBox="0 0 340 240"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className="w-full max-w-sm mx-auto"
+    aria-hidden="true"
+  >
+    {/* Connecting path (dashed curve) */}
+    <path
+      d="M 60 190 C 80 190 100 120 170 120 C 240 120 260 56 290 56"
+      stroke="rgba(255,255,255,0.25)"
+      strokeWidth="2"
+      strokeDasharray="6 5"
+      strokeLinecap="round"
+    />
+
+    {/* Step 1 — Upload CV (bottom left) */}
+    <rect
+      x="24"
+      y="162"
+      width="72"
+      height="60"
+      rx="12"
+      fill="rgba(255,255,255,0.12)"
+      stroke="rgba(255,255,255,0.25)"
+      strokeWidth="1.5"
+    />
+    <rect
+      x="36"
+      y="174"
+      width="48"
+      height="5"
+      rx="2.5"
+      fill="rgba(255,255,255,0.6)"
+    />
+    <rect
+      x="36"
+      y="184"
+      width="40"
+      height="3.5"
+      rx="1.75"
+      fill="rgba(255,255,255,0.3)"
+    />
+    <rect
+      x="36"
+      y="192"
+      width="44"
+      height="3.5"
+      rx="1.75"
+      fill="rgba(255,255,255,0.3)"
+    />
+    <rect
+      x="36"
+      y="200"
+      width="36"
+      height="3.5"
+      rx="1.75"
+      fill="rgba(255,255,255,0.3)"
+    />
+    {/* Step number */}
+    <circle
+      cx="36"
+      cy="170"
+      r="8"
+      fill="rgba(255,255,255,0.15)"
+      stroke="rgba(255,255,255,0.3)"
+      strokeWidth="1"
+    />
+    <text
+      x="36"
+      y="174"
+      fontSize="8"
+      fontWeight="700"
+      fill="white"
+      textAnchor="middle"
+      fontFamily="Arial, sans-serif"
+    >
+      1
+    </text>
+    <text
+      x="60"
+      y="236"
+      fontSize="8"
+      fill="rgba(255,255,255,0.6)"
+      textAnchor="middle"
+      fontFamily="Arial, sans-serif"
+    >
+      Upload CV
+    </text>
+
+    {/* Step 2 — Decode (middle) */}
+    <rect
+      x="134"
+      y="96"
+      width="72"
+      height="60"
+      rx="12"
+      fill="rgba(255,255,255,0.14)"
+      stroke="rgba(255,255,255,0.3)"
+      strokeWidth="1.5"
+    />
+    {/* Search icon inside */}
+    <circle
+      cx="166"
+      cy="122"
+      r="11"
+      stroke="rgba(255,255,255,0.6)"
+      strokeWidth="2"
+      fill="none"
+    />
+    <line
+      x1="174"
+      y1="130"
+      x2="180"
+      y2="136"
+      stroke="rgba(255,255,255,0.6)"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <circle cx="166" cy="122" r="5" fill="rgba(255,255,255,0.2)" />
+    <circle
+      cx="146"
+      cy="102"
+      r="8"
+      fill="rgba(255,255,255,0.15)"
+      stroke="rgba(255,255,255,0.35)"
+      strokeWidth="1"
+    />
+    <text
+      x="146"
+      y="106"
+      fontSize="8"
+      fontWeight="700"
+      fill="white"
+      textAnchor="middle"
+      fontFamily="Arial, sans-serif"
+    >
+      2
+    </text>
+    <text
+      x="170"
+      y="172"
+      fontSize="8"
+      fill="rgba(255,255,255,0.6)"
+      textAnchor="middle"
+      fontFamily="Arial, sans-serif"
+    >
+      Decode JD
+    </text>
+
+    {/* Step 3 — Tailored CV (top right) */}
+    <rect
+      x="252"
+      y="28"
+      width="72"
+      height="72"
+      rx="12"
+      fill="rgba(255,255,255,0.18)"
+      stroke="rgba(255,255,255,0.35)"
+      strokeWidth="1.5"
+    />
+    {/* Checkmark + sparkle */}
+    <circle
+      cx="288"
+      cy="60"
+      r="16"
+      fill="rgba(29, 158, 117, 0.25)"
+      stroke="#1d9e75"
+      strokeWidth="1.5"
+    />
+    <path
+      d="M280 60 L286 66 L298 52"
+      stroke="#1d9e75"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle
+      cx="262"
+      cy="34"
+      r="8"
+      fill="rgba(255,255,255,0.15)"
+      stroke="rgba(255,255,255,0.35)"
+      strokeWidth="1"
+    />
+    <text
+      x="262"
+      y="38"
+      fontSize="8"
+      fontWeight="700"
+      fill="white"
+      textAnchor="middle"
+      fontFamily="Arial, sans-serif"
+    >
+      3
+    </text>
+    <text
+      x="288"
+      y="112"
+      fontSize="8"
+      fill="rgba(255,255,255,0.6)"
+      textAnchor="middle"
+      fontFamily="Arial, sans-serif"
+    >
+      Apply!
+    </text>
+
+    {/* "AI" label floating beside step 2 */}
+    <rect
+      x="204"
+      y="108"
+      width="38"
+      height="20"
+      rx="10"
+      fill="#ef9f27"
+      opacity="0.85"
+    />
+    <text
+      x="223"
+      y="122"
+      fontSize="9"
+      fontWeight="600"
+      fill="white"
+      textAnchor="middle"
+      fontFamily="Arial, sans-serif"
+    >
+      ✦ AI
+    </text>
+
+    {/* Decorative dots */}
+    <circle cx="110" cy="150" r="3.5" fill="rgba(255,255,255,0.3)" />
+    <circle cx="232" cy="88" r="3.5" fill="rgba(255,255,255,0.3)" />
+    <circle cx="26" cy="136" r="3" fill="#ef9f27" opacity="0.5" />
+    <circle cx="320" cy="140" r="4" fill="rgba(255,255,255,0.15)" />
+
+    {/* Sparkles */}
+    <path d="M112 64 L114 60 L116 64 L112 66 Z" fill="rgba(255,255,255,0.5)" />
+    <path d="M22 80 L24 76 L26 80 L22 82 Z" fill="rgba(255,255,255,0.35)" />
+    <path
+      d="M310 180 L312 176 L314 180 L310 182 Z"
+      fill="#1d9e75"
+      opacity="0.6"
+    />
+  </svg>
+);
+
+// ─── Signup page ──────────────────────────────────────────
+
 const Signup = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const navigate = useNavigate();
@@ -40,20 +291,11 @@ const Signup = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
   const { toast } = useToast();
 
-  // Redirect to dashboard if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       navigate("/dashboard", { replace: true });
     }
   }, [isAuthenticated, navigate]);
-
-  // NOTE: success state and "Check your email" screen removed
-  // Email confirmation is disabled in Supabase for development
-  // Users are redirected directly to dashboard after signup
-  // Re-enable when deploying to production:
-  //   1. Turn on "Confirm email" in Supabase Auth settings
-  //   2. Restore the success state and confirmation screen below
-  // const [success, setSuccess] = useState(false);
 
   const {
     register,
@@ -72,8 +314,6 @@ const Signup = () => {
         fullName: data.fullName,
       });
       toast.success("Account created! Welcome to Seevv.");
-      // Previously: setSuccess(true) — showed "Check your email" screen
-      // Now: redirect straight to dashboard (email confirmation disabled)
       setTimeout(() => navigate("/dashboard"), 800);
     } catch (error) {
       const message =
@@ -97,86 +337,104 @@ const Signup = () => {
     }
   };
 
-  // — EMAIL CONFIRMATION SCREEN (disabled for development) —
-  // Restore this block when email confirmation is re-enabled in production:
-  //
-  // if (success) {
-  //   return (
-  //     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
-  //       <div className="w-full max-w-md text-center">
-  //         <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-6">
-  //           <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-  //             stroke="#1D9E75" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-  //             <polyline points="20 6 9 17 4 12" />
-  //           </svg>
-  //         </div>
-  //         <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-  //           Check your email
-  //         </h2>
-  //         <p className="text-gray-400 text-sm mb-8">
-  //           We've sent a confirmation link to your email address.
-  //           Click the link to activate your account.
-  //         </p>
-  //         <Button variant="primary" fullWidth onClick={() => navigate("/login")}>
-  //           Back to login
-  //         </Button>
-  //       </div>
-  //     </div>
-  //   );
-  // }
-
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-brand-600 flex-col justify-between p-12">
-        <div>
+      {/* Left panel — branding + illustration */}
+      <div className="hidden lg:flex lg:w-1/2 bg-brand-600 flex-col justify-between p-12 relative overflow-hidden">
+        {/* Subtle background grid */}
+        <div className="absolute inset-0 opacity-5">
+          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern
+                id="grid-signup"
+                width="40"
+                height="40"
+                patternUnits="userSpaceOnUse"
+              >
+                <path
+                  d="M 40 0 L 0 0 0 40"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="1"
+                />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid-signup)" />
+          </svg>
+        </div>
+
+        {/* <div className="relative z-10">
           <span className="text-2xl font-semibold text-white tracking-tight">
             Seevv
           </span>
+        </div> */}
+
+        <div className="h-16 px-5 border-gray-100 flex items-center justify-between flex-shrink-0">
+          <img
+            src="/altnewlogo.png"
+            alt="Seevv"
+            className="lg:h-12 h-12 object-contain cursor-pointer"
+          />
+          {/* Close button — mobile only */}
         </div>
-        <div>
-          <h2 className="text-3xl font-semibold text-white leading-snug mb-4">
+
+        {/* Journey illustration */}
+        <div className="relative z-10 flex-1 flex items-center justify-center py-6">
+          <JourneyIllustration />
+        </div>
+
+        <div className="relative z-10">
+          <h2 className="text-3xl font-semibold text-white leading-snug mb-3">
             Your CV, perfectly positioned for every role.
           </h2>
-          <p className="text-brand-200 text-base leading-relaxed">
+          <p className="text-brand-200 text-sm leading-relaxed mb-6">
             Join thousands of job seekers using Seevv to decode job
             descriptions, tailor their CVs, and land more interviews.
           </p>
-        </div>
-        <div className="space-y-3">
-          {[
-            "Deep Decoder — understand what companies actually need",
-            "AI CV rewriter that sounds like you",
-            "Gap-to-Goal roadmap to close skill gaps",
-            "Interview prep tied to your tailored CV",
-          ].map((feature) => (
-            <div key={feature} className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full bg-teal-400 flex items-center justify-center flex-shrink-0">
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
+          <div className="space-y-2.5">
+            {[
+              "Deep Decoder — understand what companies actually need",
+              "AI CV rewriter that sounds like you",
+              "Voice-matched cover letters in minutes",
+              "Export a polished PDF, ready to send",
+            ].map((feature) => (
+              <div key={feature} className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-teal-400/80 flex items-center justify-center shrink-0">
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <p className="text-brand-100 text-sm">{feature}</p>
               </div>
-              <p className="text-brand-100 text-sm">{feature}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Right panel — form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white overflow-y-auto">
+        <div className="w-full max-w-md py-8">
           {/* Mobile logo */}
-          <div className="lg:hidden mb-8">
+          {/* <div className="lg:hidden mb-8">
             <span className="text-2xl font-semibold text-brand-600">Seevv</span>
+          </div> */}
+          {/* Brand + close button */}
+          <div className="h-16 px-5 flex items-center justify-between flex-shrink-0 lg:hidden mb-8">
+            <img
+              src="/logo.png"
+              alt="Seevv"
+              className="lg:h-12 h-12 w-full object-contain cursor-pointer"
+            />
+            {/* Close button — mobile only */}
           </div>
 
           <h1 className="text-2xl font-semibold text-gray-900 mb-1">
@@ -244,7 +502,6 @@ const Signup = () => {
               error={errors.fullName?.message}
               {...register("fullName")}
             />
-
             <Input
               label="Email address"
               type="email"
@@ -252,7 +509,6 @@ const Signup = () => {
               error={errors.email?.message}
               {...register("email")}
             />
-
             <Input
               label="Password"
               type="password"
@@ -261,7 +517,6 @@ const Signup = () => {
               error={errors.password?.message}
               {...register("password")}
             />
-
             <Input
               label="Confirm password"
               type="password"
@@ -269,7 +524,6 @@ const Signup = () => {
               error={errors.confirmPassword?.message}
               {...register("confirmPassword")}
             />
-
             <Button
               type="submit"
               variant="primary"

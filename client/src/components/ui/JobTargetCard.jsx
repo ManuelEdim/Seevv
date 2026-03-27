@@ -1,5 +1,7 @@
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge, MatchScoreRing } from "@/components/ui";
+import { MatchScoreRing } from "@/components/ui";
+import { supabase } from "@/lib/supabase";
 
 const statusConfig = {
   saved: { label: "Saved", variant: "default" },
@@ -17,10 +19,81 @@ const priorityConfig = {
   low: { label: "Low", color: "text-gray-400 bg-gray-50" },
 };
 
-const JobTargetCard = ({ job, onDelete }) => {
+const statusOptions = [
+  { value: "saved", label: "Saved", color: "text-gray-600" },
+  { value: "applied", label: "Applied", color: "text-blue-600" },
+  { value: "interview", label: "Interview", color: "text-teal-600" },
+  { value: "offer", label: "Offer", color: "text-teal-700" },
+  { value: "rejected", label: "Rejected", color: "text-coral-600" },
+  { value: "withdrawn", label: "Withdrawn", color: "text-gray-400" },
+];
+
+const statusBadgeStyle = (status) => {
+  switch (status) {
+    case "saved":
+      return "bg-gray-100 text-gray-600 border-gray-200";
+    case "applied":
+      return "bg-blue-50 text-blue-700 border-blue-100";
+    case "interview":
+      return "bg-teal-50 text-teal-700 border-teal-100";
+    case "offer":
+      return "bg-teal-50 text-teal-800 border-teal-200";
+    case "rejected":
+      return "bg-coral-50 text-coral-700 border-coral-100";
+    case "withdrawn":
+      return "bg-gray-50 text-gray-400 border-gray-100";
+    default:
+      return "bg-gray-100 text-gray-600 border-gray-200";
+  }
+};
+
+const JobTargetCard = ({ job, onStatusChange, onDelete }) => {
   const navigate = useNavigate();
-  const status = statusConfig[job.status] || statusConfig.saved;
+  const [currentStatus, setCurrentStatus] = useState(job.status || "saved");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const dropdownRef = useRef(null);
+
   const priority = priorityConfig[job.priority] || priorityConfig.medium;
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleStatusChange = async (newStatus) => {
+    if (newStatus === currentStatus) {
+      setDropdownOpen(false);
+      return;
+    }
+
+    const previous = currentStatus;
+    setCurrentStatus(newStatus); // optimistic
+    setDropdownOpen(false);
+    setIsUpdating(true);
+
+    try {
+      const { error } = await supabase
+        .from("job_targets")
+        .update({ status: newStatus })
+        .eq("id", job.id);
+
+      if (error) throw error;
+
+      if (onStatusChange) onStatusChange();
+    } catch (err) {
+      setCurrentStatus(previous); // revert on failure
+      console.error("Failed to update status:", err.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   return (
     <div
@@ -48,20 +121,71 @@ const JobTargetCard = ({ job, onDelete }) => {
                 {job.work_type ? ` · ${job.work_type}` : ""}
               </p>
             </div>
-            {/* Match score ring */}
             <MatchScoreRing score={job.match_score || 0} size="sm" />
           </div>
 
           {/* Tags row */}
           <div className="flex items-center gap-2 mt-3 flex-wrap">
-            <Badge variant={status.variant} size="sm">
-              {status.label}
-            </Badge>
+            {/* Status badge — clickable dropdown */}
+            <div
+              className="relative"
+              ref={dropdownRef}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setDropdownOpen((p) => !p)}
+                className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium border transition-all cursor-pointer ${
+                  isUpdating ? "opacity-60" : "hover:opacity-80"
+                } ${statusBadgeStyle(currentStatus)}`}
+              >
+                {isUpdating
+                  ? "..."
+                  : statusConfig[currentStatus]?.label || "Saved"}
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  className={`transition-transform duration-150 ${
+                    dropdownOpen ? "rotate-180" : ""
+                  }`}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              {/* Dropdown menu */}
+              {dropdownOpen && (
+                <div className="absolute left-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-modal z-50 py-1 min-w-[130px]">
+                  {statusOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleStatusChange(option.value)}
+                      className={`w-full text-left px-3 py-2 text-xs font-medium hover:bg-gray-50 transition-colors cursor-pointer flex items-center gap-2 ${option.color} ${
+                        currentStatus === option.value ? "bg-gray-50" : ""
+                      }`}
+                    >
+                      {currentStatus === option.value ? (
+                        <span className="text-teal-500">✓</span>
+                      ) : (
+                        <span className="w-3 inline-block" />
+                      )}
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Priority badge */}
             <span
               className={`text-xs px-2 py-0.5 rounded-full font-medium ${priority.color}`}
             >
               {priority.label}
             </span>
+
             {job.salary_range && (
               <span className="text-xs text-gray-400">{job.salary_range}</span>
             )}
@@ -79,13 +203,13 @@ const JobTargetCard = ({ job, onDelete }) => {
             year: "numeric",
           })}
         </p>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/cv?jobId=${job.id}`);
+              navigate(`/cv?tailor=${job.id}`);
             }}
-            className="text-xs text-brand-600 hover:text-brand-800 font-medium cursor-pointer transition-colors"
+            className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
           >
             View CV
           </button>
@@ -107,7 +231,7 @@ const JobTargetCard = ({ job, onDelete }) => {
                   e.stopPropagation();
                   onDelete(job.id);
                 }}
-                className="text-xs text-red-400 hover:text-red-600 font-medium cursor-pointer transition-colors"
+                className="text-xs text-gray-400 hover:text-coral-600 cursor-pointer transition-colors"
               >
                 Delete
               </button>

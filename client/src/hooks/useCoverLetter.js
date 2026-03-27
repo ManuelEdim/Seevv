@@ -11,12 +11,14 @@ const useCoverLetter = () => {
 
   const [job, setJob] = useState(null);
   const [coverLetter, setCoverLetter] = useState(null);
+  const [allCoverLetters, setAllCoverLetters] = useState([]);
   const [content, setContent] = useState("");
   const [tone, setTone] = useState("formal");
   const [wordCount, setWordCount] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingAll, setIsLoadingAll] = useState(true);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [error, setError] = useState(null);
   const [jobs, setJobs] = useState([]);
@@ -35,6 +37,31 @@ const useCoverLetter = () => {
       setJobs(data || []);
     } catch (err) {
       console.error("Failed to fetch jobs:", err);
+    }
+  }, [user]);
+
+  // Fetch ALL cover letters for this user (for the list view)
+  const fetchAllCoverLetters = useCallback(async () => {
+    if (!user) return;
+    setIsLoadingAll(true);
+    try {
+      const { data, error } = await supabase
+        .from("cover_letters")
+        .select(
+          `
+          *,
+          job_target:job_targets(id, job_title, company_name)
+        `,
+        )
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+      setAllCoverLetters(data || []);
+    } catch (err) {
+      console.error("Failed to fetch cover letters:", err);
+    } finally {
+      setIsLoadingAll(false);
     }
   }, [user]);
 
@@ -67,7 +94,6 @@ const useCoverLetter = () => {
           setWordCount(data.content.split(/\s+/).filter(Boolean).length);
         }
 
-        // Also fetch the job details
         const { data: jobData } = await supabase
           .from("job_targets")
           .select("*")
@@ -85,9 +111,46 @@ const useCoverLetter = () => {
     [user],
   );
 
+  // Load a saved cover letter into the editor
+  const setActiveLetter = useCallback((letter) => {
+    setCoverLetter(letter);
+    setContent(letter.content);
+    setTone(letter.tone);
+    setWordCount(letter.content.split(/\s+/).filter(Boolean).length);
+    setHasUnsavedChanges(false);
+    if (letter.job_target) setJob(letter.job_target);
+  }, []);
+
+  // Clear the editor for composing a new letter
+  const clearEditor = useCallback(() => {
+    setCoverLetter(null);
+    setContent("");
+    setTone("formal");
+    setWordCount(0);
+    setHasUnsavedChanges(false);
+    setJob(null);
+    setError(null);
+  }, []);
+
+  // Delete a cover letter by id
+  const deleteCoverLetter = useCallback(
+    async (id) => {
+      const { error } = await supabase
+        .from("cover_letters")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      setAllCoverLetters((prev) => prev.filter((cl) => cl.id !== id));
+    },
+    [user],
+  );
+
   useEffect(() => {
     fetchJobs();
-  }, [fetchJobs]);
+    fetchAllCoverLetters();
+  }, [fetchJobs, fetchAllCoverLetters]);
 
   useEffect(() => {
     if (jobId) fetchCoverLetter(jobId);
@@ -119,7 +182,6 @@ const useCoverLetter = () => {
         );
         setHasUnsavedChanges(true);
 
-        // Call success callback if provided
         if (onSuccess) onSuccess();
       } catch (err) {
         setError(
@@ -141,7 +203,6 @@ const useCoverLetter = () => {
 
       try {
         if (coverLetter) {
-          // Update existing
           const { error } = await supabase
             .from("cover_letters")
             .update({
@@ -154,8 +215,16 @@ const useCoverLetter = () => {
             .eq("user_id", user.id);
 
           if (error) throw error;
+
+          // Update in-list state
+          setAllCoverLetters((prev) =>
+            prev.map((cl) =>
+              cl.id === coverLetter.id
+                ? { ...cl, content, tone, word_count: wordCount, updated_at: new Date().toISOString() }
+                : cl,
+            ),
+          );
         } else {
-          // Create new
           const { data, error } = await supabase
             .from("cover_letters")
             .insert({
@@ -165,11 +234,17 @@ const useCoverLetter = () => {
               tone,
               word_count: wordCount,
             })
-            .select()
+            .select(
+              `
+              *,
+              job_target:job_targets(id, job_title, company_name)
+            `,
+            )
             .single();
 
           if (error) throw error;
           setCoverLetter(data);
+          setAllCoverLetters((prev) => [data, ...prev]);
         }
 
         setHasUnsavedChanges(false);
@@ -187,12 +262,14 @@ const useCoverLetter = () => {
     jobs,
     jobId,
     coverLetter,
+    allCoverLetters,
     content,
     tone,
     wordCount,
     isGenerating,
     isSaving,
     isLoading,
+    isLoadingAll,
     hasUnsavedChanges,
     error,
     setTone,
@@ -200,6 +277,10 @@ const useCoverLetter = () => {
     generateCoverLetter,
     saveCoverLetter,
     fetchCoverLetter,
+    fetchAllCoverLetters,
+    deleteCoverLetter,
+    setActiveLetter,
+    clearEditor,
   };
 };
 
