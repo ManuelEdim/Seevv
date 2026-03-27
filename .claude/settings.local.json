@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(find c:/Users/HomePC/Desktop/Seev -path */node_modules -prune -o -type f -name *.md -o -name README*)",
-      "Bash(find c:/Users/HomePC/Desktop/Seev -path */node_modules -prune -o -type f -name *profile* -o -name *voice*)"
+      "Bash(find c:/Users/HomePC/Desktop/Seev -path */node_modules -prune -o -type f -name *profile* -o -name *voice*)",
+      "Bash(npm install:*)"
     ]
   }
 }
