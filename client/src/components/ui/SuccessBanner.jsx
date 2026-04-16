@@ -5,7 +5,7 @@ const SuccessBanner = ({ isVisible, title, description, icon }) => {
     <div className="animate-slide-down">
       <div className="flex items-start gap-3 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
         {/* Animated checkmark */}
-        <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+        <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
           {icon || (
             <svg
               width="16"

@@ -369,7 +369,7 @@ const Signup = () => {
           </span>
         </div> */}
 
-        <div className="h-16 px-5 border-gray-100 flex items-center justify-between flex-shrink-0">
+        <div className="h-16 px-5 border-gray-100 flex items-center justify-between shrink-0">
           <img
             src="/altnewlogo.png"
             alt="Seevv"
@@ -428,7 +428,7 @@ const Signup = () => {
             <span className="text-2xl font-semibold text-brand-600">Seevv</span>
           </div> */}
           {/* Brand + close button */}
-          <div className="h-16 px-5 flex items-center justify-between flex-shrink-0 lg:hidden mb-8">
+          <div className="h-16 px-5 flex items-center justify-between shrink-0 lg:hidden mb-8">
             <img
               src="/logo.png"
               alt="Seevv"

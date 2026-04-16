@@ -1,4 +1,4 @@
-import { generateCoverLetter } from "../lib/ai.js";
+import { generateCoverLetter, buildMarketContext } from "../lib/ai.js";
 import { supabase } from "../lib/supabase.js";
 
 export const generateCoverLetterController = async (req, res) => {
@@ -35,12 +35,13 @@ export const generateCoverLetterController = async (req, res) => {
     // Get user's voice sample
     const { data: profile } = await supabase
       .from("profiles")
-      .select("voice_sample, full_name")
+      .select("voice_sample, full_name, country, nysc_status")
       .eq("id", userId)
       .single();
 
     const cvText = cv?.raw_text || "";
     const voiceSample = profile?.voice_sample || null;
+    const marketContext = buildMarketContext(profile?.country, profile?.nysc_status);
 
     // Generate cover letter with AI
     const content = await generateCoverLetter(
@@ -50,6 +51,7 @@ export const generateCoverLetterController = async (req, res) => {
       cvText,
       tone,
       voiceSample,
+      marketContext,
     );
 
     // Count words

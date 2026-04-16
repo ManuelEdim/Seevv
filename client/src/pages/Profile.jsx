@@ -290,11 +290,11 @@ const Profile = () => {
     : 0;
 
   return (
-    <div className="mx-auto space-y-5 pb-10">
+    <div className="mx-auto  space-y-5 pb-10">
       {/* ── Profile header ─────────────────────────────── */}
       <Card padding="md">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-          <div className="relative flex-shrink-0">
+          <div className="relative shrink-0">
             <div className="w-20 h-20 rounded-2xl bg-brand-100 flex items-center justify-center overflow-hidden">
               {avatarUrl ? (
                 <img
@@ -355,6 +355,12 @@ const Profile = () => {
               <Badge variant={plan.variant} size="sm">
                 {plan.label} plan
               </Badge>
+              {profile?.voice_sample && (
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full border border-teal-100 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 inline-block" />
+                  Voice active
+                </span>
+              )}
               {user?.created_at && (
                 <span className="text-xs text-gray-400">
                   Member since{" "}
@@ -387,133 +393,139 @@ const Profile = () => {
           </div>
 
           <Button
-            variant="outline"
+            variant="primary"
             size="sm"
-            className="flex-shrink-0"
-            onClick={() => toast.info("Upgrade plans coming soon")}
+            className="shrink-0"
+            onClick={() => navigate("/pricing")}
           >
-            Upgrade
+            Upgrade →
           </Button>
         </div>
       </Card>
 
-      {/* ── Personal details ───────────────────────────── */}
-      <Section
-        title="Personal details"
-        description="Update your name and account information"
-      >
-        <form
-          onSubmit={handleProfileSubmit(onProfileSave)}
-          className="space-y-4"
+      {/* ── Two-column grid: Personal details + Voice mirroring ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Personal details */}
+        <Section
+          title="Personal details"
+          description="Update your name and account information"
         >
-          <Input
-            label="Full name"
-            placeholder="James Adeyemi"
-            error={profileErrors.full_name?.message}
-            {...registerProfile("full_name")}
-          />
-          <Input
-            label="Email address"
-            type="email"
-            placeholder="you@example.com"
-            hint="Contact support to change your email address"
-            disabled
-            {...registerProfile("email")}
-          />
-          {profileDirty && (
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              isLoading={isSaving}
-            >
-              Save changes
-            </Button>
-          )}
-        </form>
-      </Section>
+          <form
+            onSubmit={handleProfileSubmit(onProfileSave)}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
+              <Input
+                label="Full name"
+                placeholder="James Adeyemi"
+                error={profileErrors.full_name?.message}
+                {...registerProfile("full_name")}
+              />
+              <Input
+                label="Email address"
+                type="email"
+                placeholder="you@example.com"
+                hint="Contact support to change"
+                disabled
+                {...registerProfile("email")}
+              />
+            </div>
+            {profileDirty && (
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                isLoading={isSaving}
+              >
+                Save changes
+              </Button>
+            )}
+          </form>
+        </Section>
 
-      {/* ── Voice mirroring ────────────────────────────── */}
-      <Section
-        title="Voice mirroring"
-        description="Paste 200–300 words of your own writing so Seevv rewrites your CV in your voice, not a generic AI voice"
-      >
-        {/* Saved state */}
-        {voiceSaved && !editingVoice ? (
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-xs font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full">
-                  ✓ {savedVoiceWordCount} words saved
-                </span>
-              </div>
-              <p className="text-xs text-gray-400 leading-relaxed italic line-clamp-3">
-                {voicePreview}
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-shrink-0"
-              onClick={() => setEditingVoice(true)}
-            >
-              Edit
-            </Button>
-          </div>
-        ) : (
-          /* Editing state */
-          <div>
-            <textarea
-              value={voiceSample}
-              onChange={(e) => setVoiceSample(e.target.value)}
-              placeholder="Paste a cover letter, bio, or email you've written — anything that sounds like you..."
-              rows={5}
-              className="w-full px-3 py-2.5 text-sm rounded-lg border border-gray-200 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none placeholder:text-gray-400 mb-3"
-            />
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <span className="text-xs text-gray-400">
-                {voiceWordCount} words
-                {voiceSample.length > 0 && (
-                  <span
-                    className={
-                      voiceWordCount >= 200
-                        ? " text-teal-600"
-                        : " text-amber-600"
-                    }
-                  >
-                    {voiceWordCount >= 200
-                      ? " — good length"
-                      : " — aim for 200+"}
+        {/* ── Voice mirroring ────────────────────────────── */}
+        <Section
+          title="Voice mirroring"
+          description="Paste 200–300 words of your own writing so Seevv rewrites your CV in your voice, not generic AI"
+        >
+          {/* Saved state */}
+          {voiceSaved && !editingVoice ? (
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-xs font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full">
+                    ✓ {savedVoiceWordCount} words saved
                   </span>
-                )}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleVoiceSampleSave}
-                  isLoading={isSaving}
-                  disabled={!voiceSample.trim()}
-                >
-                  Save sample
-                </Button>
-                {editingVoice && (
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed italic line-clamp-3">
+                  {voicePreview}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => setEditingVoice(true)}
+              >
+                Edit
+              </Button>
+            </div>
+          ) : (
+            /* Editing state */
+            <div>
+              <textarea
+                value={voiceSample}
+                onChange={(e) => setVoiceSample(e.target.value)}
+                placeholder="Paste a cover letter, bio, or email you've written — anything that sounds like you..."
+                rows={5}
+                className="w-full px-3 py-2.5 text-sm rounded-lg border border-gray-200 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent resize-none placeholder:text-gray-400 mb-3"
+              />
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-xs text-gray-400">
+                  {voiceWordCount} words
+                  {voiceSample.length > 0 && (
+                    <span
+                      className={
+                        voiceWordCount >= 200
+                          ? " text-teal-600"
+                          : " text-amber-600"
+                      }
+                    >
+                      {voiceWordCount >= 200
+                        ? " — good length"
+                        : " — aim for 200+"}
+                    </span>
+                  )}
+                </span>
+                <div className="flex gap-2">
                   <Button
-                    variant="outline"
+                    variant="primary"
                     size="sm"
-                    onClick={() => {
-                      setEditingVoice(false);
-                      setVoiceSample(profile?.voice_sample || "");
-                    }}
+                    onClick={handleVoiceSampleSave}
+                    isLoading={isSaving}
+                    disabled={!voiceSample.trim()}
                   >
-                    Cancel
+                    Save sample
                   </Button>
-                )}
+                  {editingVoice && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingVoice(false);
+                        setVoiceSample(profile?.voice_sample || "");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </Section>
+          )}
+        </Section>
+      </div>
+      {/* end two-column grid */}
 
       {/* ── Location + Nigeria localisation ───────────── */}
       <Section

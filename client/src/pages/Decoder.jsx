@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, Badge, Spinner, Card } from "@/components/ui";
 import useDecoder from "@/hooks/useDecoder";
+import api from "@/lib/api";
 
 const confidenceColors = {
   high: "success",
@@ -69,7 +70,7 @@ const HiddenNeedTab = ({ result }) => (
       <div className="space-y-2">
         {result.positioning_advice.map((advice, i) => (
           <div key={i} className="flex items-start gap-2">
-            <div className="w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <div className="w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center shrink-0 mt-0.5">
               <span className="text-white text-xs font-bold">{i + 1}</span>
             </div>
             <p className="text-sm text-brand-900">{advice}</p>
@@ -132,7 +133,7 @@ const RequirementsTab = ({ result }) => (
           className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100"
         >
           <div
-            className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${config.color}`}
+            className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${config.color}`}
           >
             {config.icon}
           </div>
@@ -159,7 +160,7 @@ const KeywordsTab = ({ result }) => (
         key={i}
         className="flex items-center gap-3 bg-white rounded-lg border border-gray-100 p-3"
       >
-        <div className="w-6 h-6 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0">
+        <div className="w-6 h-6 rounded-full bg-brand-50 flex items-center justify-center shrink-0">
           <span className="text-xs font-bold text-brand-700">{i + 1}</span>
         </div>
         <p className="text-sm font-medium text-gray-900 flex-1 capitalize">
@@ -181,6 +182,152 @@ const KeywordsTab = ({ result }) => (
   </div>
 );
 
+// ─── Company Intelligence tab ─────────────────────────────
+
+const CompanyIntelTab = ({ jobId }) => {
+  const [intelData, setIntelData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleFetch = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await api.post("/company-intel", { jobTargetId: jobId });
+      setIntelData(data.result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!jobId) {
+    return (
+      <p className="text-sm text-gray-400 text-center py-6">
+        Company intelligence is only available when decoding from a saved job target.
+      </p>
+    );
+  }
+
+  if (!intelData && !isLoading) {
+    return (
+      <div className="text-center py-6 space-y-3">
+        <p className="text-sm text-gray-500">
+          Get deep intelligence on this company — culture signals, growth stage, interview style, and more.
+        </p>
+        <Button variant="primary" onClick={handleFetch}>
+          Analyse company
+        </Button>
+        {error && <p className="text-xs text-coral-600">{error}</p>}
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center py-8 gap-3">
+        <Spinner size="lg" />
+        <p className="text-sm text-gray-400">Gathering company intelligence…</p>
+      </div>
+    );
+  }
+
+  const r = intelData;
+  return (
+    <div className="space-y-4">
+      {r.summary && (
+        <div className="bg-brand-50 border border-brand-100 rounded-xl p-4">
+          <p className="text-xs font-semibold text-brand-800 uppercase tracking-wide mb-1">
+            Company snapshot
+          </p>
+          <p className="text-sm text-brand-900 leading-relaxed">{r.summary}</p>
+        </div>
+      )}
+
+      {r.culture_signals?.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+            Culture signals
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {r.culture_signals.map((s, i) => (
+              <span
+                key={i}
+                className="text-xs px-2.5 py-1 bg-teal-50 text-teal-800 rounded-full border border-teal-100 font-medium"
+              >
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.interview_style && (
+        <div className="bg-amber-50 rounded-xl border border-amber-100 p-4">
+          <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-1">
+            Interview style
+          </p>
+          <p className="text-sm text-amber-900">{r.interview_style}</p>
+        </div>
+      )}
+
+      {r.growth_stage && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white rounded-xl border border-gray-100 p-3">
+            <p className="text-xs text-gray-400 mb-0.5">Growth stage</p>
+            <p className="text-sm font-medium text-gray-900">{r.growth_stage}</p>
+          </div>
+          {r.likely_team_size && (
+            <div className="bg-white rounded-xl border border-gray-100 p-3">
+              <p className="text-xs text-gray-400 mb-0.5">Team size</p>
+              <p className="text-sm font-medium text-gray-900">{r.likely_team_size}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {r.red_flags?.length > 0 && (
+        <div className="bg-coral-50 rounded-xl border border-coral-100 p-4">
+          <p className="text-xs font-semibold text-coral-800 uppercase tracking-wide mb-2">
+            Watch out for
+          </p>
+          <ul className="space-y-1">
+            {r.red_flags.map((flag, i) => (
+              <li key={i} className="text-sm text-coral-900 flex items-start gap-2">
+                <span className="text-coral-400 shrink-0 mt-0.5">⚠</span>
+                {flag}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {r.positioning_tips?.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+            How to position yourself
+          </p>
+          <div className="space-y-2">
+            {r.positioning_tips.map((tip, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <div className="w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-white text-xs font-bold">{i + 1}</span>
+                </div>
+                <p className="text-sm text-gray-700">{tip}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <Button variant="outline" size="sm" onClick={handleFetch}>
+        Re-analyse
+      </Button>
+    </div>
+  );
+};
+
 // ─── Main Decoder page ────────────────────────────────────
 
 const tabs = [
@@ -188,6 +335,7 @@ const tabs = [
   { id: "signals", label: "Signals" },
   { id: "requirements", label: "Requirements" },
   { id: "keywords", label: "ATS keywords" },
+  { id: "company-intel", label: "Company intel" },
 ];
 
 const Decoder = () => {
@@ -348,6 +496,9 @@ const Decoder = () => {
               {activeTab === "keywords" && (
                 <KeywordsTab result={decoderResult} />
               )}
+              {activeTab === "company-intel" && (
+                <CompanyIntelTab jobId={jobId} />
+              )}
             </div>
           </div>
 
@@ -369,6 +520,15 @@ const Decoder = () => {
               Generate cover letter
             </Button>
           </div>
+          {jobId && (
+            <Button
+              variant="ghost"
+              fullWidth
+              onClick={() => navigate(`/gap-roadmap?jobId=${jobId}`)}
+            >
+              View skill gap roadmap →
+            </Button>
+          )}
         </div>
       )}
 

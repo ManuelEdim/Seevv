@@ -2,108 +2,178 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store";
 import { signOut } from "@/lib/auth";
 
-const navItems = [
+// ─── Nav structure — grouped by layer ─────────────────────
+
+const navGroups = [
   {
-    label: "Dashboard",
-    path: "/dashboard",
-    icon: (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect x="3" y="3" width="7" height="7" />
-        <rect x="14" y="3" width="7" height="7" />
-        <rect x="3" y="14" width="7" height="7" />
-        <rect x="14" y="14" width="7" height="7" />
-      </svg>
-    ),
+    label: null, // no section header for core
+    items: [
+      {
+        label: "Dashboard",
+        path: "/dashboard",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+          </svg>
+        ),
+      },
+      {
+        label: "Deep Decoder",
+        path: "/decoder",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+        ),
+      },
+      {
+        label: "My CVs",
+        path: "/cv",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+          </svg>
+        ),
+      },
+      {
+        label: "Cover Letter",
+        path: "/cover-letter",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22,6 12,13 2,6" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    label: "Deep Decoder",
-    path: "/decoder",
-    icon: (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="11" cy="11" r="8" />
-        <path d="m21 21-4.35-4.35" />
-      </svg>
-    ),
+    label: "Intelligence",
+    items: [
+      {
+        label: "Gap Roadmap",
+        path: "/gap-roadmap",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12h4l3-9 4 18 3-9h4" />
+          </svg>
+        ),
+      },
+      {
+        label: "Transition Mode",
+        path: "/transition",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+          </svg>
+        ),
+      },
+      {
+        label: "Speed Mode",
+        path: "/speed-mode",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+          </svg>
+        ),
+      },
+      {
+        label: "Proof of Work",
+        path: "/proof-of-work",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+        ),
+      },
+      {
+        label: "Skills Graph",
+        path: "/skills",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    label: "My CVs",
-    path: "/cv",
-    icon: (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-        <polyline points="10 9 9 9 8 9" />
-      </svg>
-    ),
+    label: "Interview",
+    items: [
+      {
+        label: "Interview Prep",
+        path: "/interview-prep",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+          </svg>
+        ),
+      },
+      {
+        label: "Mock Interview",
+        path: "/mock-interview",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
+          </svg>
+        ),
+      },
+      {
+        label: "Analytics",
+        path: "/analytics",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    label: "Cover Letter",
-    path: "/cover-letter",
-    icon: (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-        <polyline points="22,6 12,13 2,6" />
-      </svg>
-    ),
-  },
-  {
-    label: "Profile",
-    path: "/profile",
-    icon: (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-        <circle cx="12" cy="7" r="4" />
-      </svg>
-    ),
+    label: null,
+    items: [
+      {
+        label: "Profile",
+        path: "/profile",
+        icon: (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+        ),
+      },
+    ],
   },
 ];
+
+// ─── Nav link ──────────────────────────────────────────────
+
+const NavItem = ({ item, onClose }) => (
+  <NavLink
+    to={item.path}
+    onClick={onClose}
+    data-tour={item.path}
+    className={({ isActive }) =>
+      `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
+        isActive
+          ? "bg-brand-50 text-brand-700"
+          : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+      }`
+    }
+  >
+    {item.icon}
+    {item.label}
+  </NavLink>
+);
+
+// ─── Sidebar ───────────────────────────────────────────────
 
 const Sidebar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
@@ -136,88 +206,70 @@ const Sidebar = ({ isOpen, onClose }) => {
         lg:translate-x-0
       `}
     >
-      {/* Brand + close button */}
-      <div className="h-16 px-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-        <img
-          src="/logo.png"
-          alt="Seevv"
-          className="lg:h-12 h-12 object-contain cursor-pointer"
-        />
-        {/* Close button — mobile only */}
+      {/* Brand */}
+      <div className="h-16 px-5 border-b border-gray-100 flex items-center justify-between shrink-0">
+        <img src="/logo.png" alt="Seevv" className="h-10 object-contain cursor-pointer" />
         <button
           onClick={onClose}
           className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            onClick={onClose}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                isActive
-                  ? "bg-brand-50 text-brand-700"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
-              }`
-            }
-          >
-            {item.icon}
-            {item.label}
-          </NavLink>
+      <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-4">
+        {navGroups.map((group, gi) => (
+          <div key={gi}>
+            {group.label && (
+              <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 px-3 mb-1.5">
+                {group.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => (
+                <NavItem key={item.path} item={item} onClose={onClose} />
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
-      {/* User section */}
-      <div className="px-3 py-4 border-t border-gray-100">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors">
-          <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-semibold text-brand-700">
-              {initials}
-            </span>
+      {/* User + sign-out */}
+      <div className="px-3 py-3 border-t border-gray-100 space-y-1">
+        {/* Upgrade button */}
+        <button
+          onClick={() => { navigate("/pricing"); onClose?.(); }}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 transition-colors cursor-pointer"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+          </svg>
+          Upgrade plan
+        </button>
+
+        {/* User info */}
+        <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg">
+          <div className="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center shrink-0">
+            <span className="text-[10px] font-bold text-brand-700">{initials}</span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-gray-900 truncate">
               {user?.user_metadata?.full_name || "User"}
             </p>
-            <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+            <p className="text-[10px] text-gray-400 truncate">{user?.email}</p>
           </div>
         </div>
 
         <button
           onClick={handleSignOut}
-          className="w-full mt-1 flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-coral-600 hover:bg-coral-50 transition-all duration-150 cursor-pointer"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-gray-400 hover:text-coral-600 hover:bg-coral-50 transition-all duration-150 cursor-pointer"
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
+            <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
           </svg>
           Sign out
         </button>

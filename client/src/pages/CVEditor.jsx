@@ -101,7 +101,7 @@ const Accordion = ({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {pendingCount === 0 && (
             <span className="text-xs text-teal-600 font-medium">✓ Done</span>
           )}
@@ -279,7 +279,7 @@ const RoleBlock = ({ role, onDecisionChange, sectionKey, roleIndex }) => {
                 );
               }
             }}
-            className="text-xs text-brand-600 hover:text-brand-800 cursor-pointer font-medium flex-shrink-0"
+            className="text-xs text-brand-600 hover:text-brand-800 cursor-pointer font-medium shrink-0"
           >
             Accept all
           </button>

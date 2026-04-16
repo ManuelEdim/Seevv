@@ -24,7 +24,7 @@ const CVVersionCard = ({ version, onDelete }) => {
     <div className="bg-white rounded-xl border border-gray-100 shadow-card p-5 hover:border-gray-200 transition-all duration-150">
       <div className="flex items-start gap-4">
         {/* CV icon */}
-        <div className="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center shrink-0">
           <svg
             width="18"
             height="18"

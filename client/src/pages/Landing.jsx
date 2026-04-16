@@ -1639,7 +1639,7 @@ const Navbar = () => {
           {/* Logo — swaps on scroll */}
           <button
             onClick={() => scrollTo("#home")}
-            className="cursor-pointer flex-shrink-0"
+            className="cursor-pointer shrink-0"
           >
             <img
               src={scrolled ? "/logo.png" : "/altnewlogo.png"}
@@ -1885,7 +1885,7 @@ const HeroSection = () => {
             <HeroDashboardIllustration />
             {/* Floating match card */}
             <div className="absolute -left-6 top-12 bg-white rounded-2xl shadow-2xl px-4 py-3.5 flex items-center gap-3 animate-slide-down border border-gray-100">
-              <div className="w-11 h-11 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
                 <svg
                   width="20"
                   height="20"
@@ -2363,7 +2363,7 @@ const ServicesSection = () => {
                       className="flex items-center gap-2.5 text-sm text-gray-600"
                     >
                       <div
-                        className={`w-4 h-4 rounded-full ${s.bg} ${s.color} flex items-center justify-center flex-shrink-0`}
+                        className={`w-4 h-4 rounded-full ${s.bg} ${s.color} flex items-center justify-center shrink-0`}
                       >
                         <svg
                           width="8"
@@ -2438,7 +2438,7 @@ const StepItem = ({ step, index, colorMap }) => {
               className="flex items-center gap-3 text-sm text-gray-700"
             >
               <div
-                className={`w-5 h-5 rounded-full ${c.bg} ${c.text} flex items-center justify-center flex-shrink-0`}
+                className={`w-5 h-5 rounded-full ${c.bg} ${c.text} flex items-center justify-center shrink-0`}
               >
                 <svg
                   width="9"
@@ -2721,7 +2721,7 @@ const TestimonialsSection = () => {
               </p>
               <div className="flex items-center gap-3">
                 <div
-                  className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                  className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
                   style={{ backgroundColor: t.color }}
                 >
                   {t.initials}
@@ -2910,7 +2910,7 @@ const PricingSection = () => {
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-center gap-3 text-sm">
                     <div
-                      className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${plan.highlight ? "bg-teal-400" : "bg-brand-50"}`}
+                      className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${plan.highlight ? "bg-teal-400" : "bg-brand-50"}`}
                     >
                       <svg
                         width="8"
@@ -2939,7 +2939,7 @@ const PricingSection = () => {
                     key={f}
                     className="flex items-center gap-3 text-sm opacity-35"
                   >
-                    <div className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                    <div className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
                       <svg
                         width="8"
                         height="8"
@@ -3067,7 +3067,7 @@ const PartnersSection = () => {
                 }`}
                 style={{ transitionDelay: `${i * 60}ms` }}
               >
-                <div className="w-13 h-13 bg-white rounded-xl shadow-sm flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                <div className="w-13 h-13 bg-white rounded-xl shadow-sm flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 transition-transform">
                   {p.icon}
                 </div>
                 <div>
@@ -3260,7 +3260,7 @@ const ContactSection = () => {
 
             {/* Response time — full width */}
             <div className="group flex items-center gap-4 p-5 bg-gradient-to-br from-white to-brand-50/40 rounded-2xl border border-brand-100/60 hover:border-brand-200 hover:shadow-md hover:from-brand-50 hover:to-teal-50/30 transition-all duration-300 cursor-default">
-              <div className="w-10 h-10 bg-white border border-brand-100 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm group-hover:border-brand-200 transition-colors duration-300">
+              <div className="w-10 h-10 bg-white border border-brand-100 rounded-xl flex items-center justify-center shrink-0 shadow-sm group-hover:border-brand-200 transition-colors duration-300">
                 {contacts[2].icon}
               </div>
               <div>

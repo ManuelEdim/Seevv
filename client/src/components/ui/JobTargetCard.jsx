@@ -102,7 +102,7 @@ const JobTargetCard = ({ job, onStatusChange, onDelete }) => {
     >
       <div className="flex items-start gap-4">
         {/* Company avatar */}
-        <div className="w-10 h-10 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
           <span className="text-sm font-semibold text-brand-700">
             {job.company_name?.charAt(0).toUpperCase()}
           </span>

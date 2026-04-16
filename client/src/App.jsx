@@ -13,6 +13,16 @@ import CVManager from "@/pages/CVManager";
 import CVEditor from "@/pages/CVEditor";
 import CoverLetter from "@/pages/CoverLetter";
 import Profile from "@/pages/Profile";
+import GapRoadmap from "@/pages/GapRoadmap";
+import TransitionMode from "@/pages/TransitionMode";
+import SpeedMode from "@/pages/SpeedMode";
+import ProofOfWork from "@/pages/ProofOfWork";
+import SkillsGraph from "@/pages/SkillsGraph";
+import RecruiterPortal from "@/pages/RecruiterPortal";
+import Pricing from "@/pages/Pricing";
+import InterviewPrep from "@/pages/InterviewPrep";
+import MockInterview from "@/pages/MockInterview";
+import ApplicationAnalytics from "@/pages/ApplicationAnalytics";
 import NotFound from "@/pages/NotFound";
 
 const App = () => {
@@ -93,6 +103,108 @@ const App = () => {
               <AppLayout>
                 <Profile />
               </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/gap-roadmap"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <GapRoadmap />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/transition"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <TransitionMode />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/speed-mode"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SpeedMode />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/skills"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SkillsGraph />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        {/* Recruiter portal — standalone, no AppLayout, role-gated on the page */}
+        <Route
+          path="/recruiter/*"
+          element={
+            <ProtectedRoute>
+              <RecruiterPortal />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/proof-of-work"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <ProofOfWork />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/interview-prep"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <InterviewPrep />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mock-interview"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <MockInterview />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <ApplicationAnalytics />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Pricing — no AppLayout, standalone page */}
+        <Route
+          path="/pricing"
+          element={
+            <ProtectedRoute>
+              <Pricing />
             </ProtectedRoute>
           }
         />

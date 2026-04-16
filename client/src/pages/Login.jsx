@@ -334,7 +334,7 @@ const Login = () => {
           </svg>
         </div>
 
-        <div className="h-16 px-5 border-gray-100 flex items-center justify-between flex-shrink-0">
+        <div className="h-16 px-5 border-gray-100 flex items-center justify-between shrink-0">
           <img
             src="/altnewlogo.png"
             alt="Seevv"
@@ -383,7 +383,7 @@ const Login = () => {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
-          <div className="h-16 px-5 flex items-center justify-between flex-shrink-0 lg:hidden mb-8">
+          <div className="h-16 px-5 flex items-center justify-between shrink-0 lg:hidden mb-8">
             <img
               src="/logo.png"
               alt="Seevv"

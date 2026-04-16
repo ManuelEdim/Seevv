@@ -62,7 +62,7 @@ const CoverLetterCard = ({ letter, onEdit, onDelete, isDeleting }) => {
     <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-4 hover:border-brand-200 transition-all duration-150 group">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
             <span className="text-sm font-bold text-brand-700">
               {letter.job_target?.company_name?.charAt(0)?.toUpperCase() || "?"}
             </span>
@@ -76,7 +76,7 @@ const CoverLetterCard = ({ letter, onEdit, onDelete, isDeleting }) => {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <span
             className={`text-xs px-2 py-0.5 rounded-full font-medium ${tone.color}`}
           >
@@ -382,7 +382,7 @@ const CoverLetter = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
+    <div className="mx-auto space-y-5">
       {/* Back button */}
       {!jobId && (
         <button
@@ -445,7 +445,7 @@ const CoverLetter = () => {
                       : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                   }`}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
                     <span className="text-xs font-semibold text-brand-700">
                       {j.company_name?.charAt(0).toUpperCase()}
                     </span>
@@ -486,7 +486,7 @@ const CoverLetter = () => {
                 setSelectedJobId("");
                 handleContentChange("");
               }}
-              className="text-xs text-brand-600 hover:text-brand-800 cursor-pointer flex-shrink-0"
+              className="text-xs text-brand-600 hover:text-brand-800 cursor-pointer shrink-0"
             >
               Change
             </button>

@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Button, EmptyState, Spinner, Card, Badge } from "@/components/ui";
 import CVUploader from "@/components/CVUploader";
 import CVVersionCard from "@/components/CVVersionCard";
 import useCVManager from "@/hooks/useCVManager";
 import { useToast } from "@/context/ToastContext";
+import { useAuthStore } from "@/store";
+import { supabase } from "@/lib/supabase";
 import api from "@/lib/api";
 
 const CVManager = () => {
@@ -12,6 +14,7 @@ const CVManager = () => {
   const [searchParams] = useSearchParams();
   const tailorJobId = searchParams.get("tailor");
   const { toast } = useToast();
+  const user = useAuthStore((state) => state.user);
 
   const {
     masterCV,
@@ -27,6 +30,20 @@ const CVManager = () => {
   const [isTailoring, setIsTailoring] = useState(false);
   const [deletingVersionId, setDeletingVersionId] = useState(null);
   const [tailoringTriggered, setTailoringTriggered] = useState(false);
+  const [hasVoiceSample, setHasVoiceSample] = useState(null); // null = loading
+
+  // Check if user has set a voice sample
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from("profiles")
+      .select("voice_sample")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        setHasVoiceSample(!!(data?.voice_sample && data.voice_sample.trim().length > 50));
+      });
+  }, [user?.id]);
 
   // Auto-trigger tailoring if coming from decoder
   useEffect(() => {
@@ -142,6 +159,25 @@ const CVManager = () => {
 
   return (
     <div className="mx-auto space-y-6 pb-10">
+      {/* ── Voice mirroring nudge ─────────────────────── */}
+      {hasVoiceSample === false && !isTailoring && masterCV && (
+        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <span className="text-lg shrink-0">🎤</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-amber-800">Voice mirroring is not set</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Add your writing sample so rewrites sound like you — not generic AI.
+            </p>
+          </div>
+          <Link
+            to="/profile"
+            className="text-xs font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900 shrink-0"
+          >
+            Set it up →
+          </Link>
+        </div>
+      )}
+
       {/* ── Tailoring in progress banner ──────────────── */}
       {isTailoring && (
         <Card padding="md">
@@ -149,12 +185,18 @@ const CVManager = () => {
             <Spinner size="lg" />
             <div>
               <p className="text-sm font-semibold text-gray-900 mb-1">
-                Tailoring your CV with SEEVV...
+                Tailoring your CV with Seevv...
               </p>
               <p className="text-xs text-gray-400">
-                Rewriting each section for this specific role. This takes 20-30
-                seconds.
+                {hasVoiceSample
+                  ? "Rewriting in your voice for this specific role. This takes 20-30 seconds."
+                  : "Rewriting each section for this specific role. This takes 20-30 seconds."}
               </p>
+              {hasVoiceSample && (
+                <p className="text-xs text-teal-600 mt-1 font-medium">
+                  ✓ Voice mirroring active
+                </p>
+              )}
             </div>
           </div>
         </Card>
@@ -191,7 +233,7 @@ const CVManager = () => {
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-shrink-0"
+                className="shrink-0"
                 onClick={() => setShowUploader(true)}
               >
                 Replace
@@ -218,7 +260,7 @@ const CVManager = () => {
           {masterCV && !showUploader && (
             <Card padding="md">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-50 rounded-xl flex items-center justify-center shrink-0">
                   <svg
                     width="20"
                     height="20"
@@ -271,7 +313,7 @@ const CVManager = () => {
 
                 <button
                   onClick={handleDeleteMasterCV}
-                  className="text-xs text-gray-400 hover:text-coral-600 cursor-pointer transition-colors flex-shrink-0 mt-0.5"
+                  className="text-xs text-gray-400 hover:text-coral-600 cursor-pointer transition-colors shrink-0 mt-0.5"
                 >
                   Delete
                 </button>

@@ -5,6 +5,7 @@ import {
   calculateMatchScore,
   detectBlindSpots,
   scoreSectionMatch,
+  buildMarketContext,
 } from "../lib/ai.js";
 import { supabase } from "../lib/supabase.js";
 
@@ -233,11 +234,12 @@ export const rewriteCVController = async (req, res) => {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("voice_sample")
+      .select("voice_sample, country, nysc_status")
       .eq("id", userId)
       .single();
 
     const voiceSample = profile?.voice_sample || null;
+    const marketContext = buildMarketContext(profile?.country, profile?.nysc_status);
     const rawText = cv.raw_text;
 
     if (!rawText) {
@@ -359,6 +361,7 @@ export const rewriteCVController = async (req, res) => {
               `work experience for the role: ${role.title}`,
               jobDescription,
               voiceSample,
+              marketContext,
             );
             return {
               ...role,
@@ -433,6 +436,7 @@ export const rewriteCVController = async (req, res) => {
         key,
         jobDescription,
         voiceSample,
+        marketContext,
       );
 
       let fullRewrite = rewrittenBullets.join("\n");
@@ -443,6 +447,7 @@ export const rewriteCVController = async (req, res) => {
             sectionText.slice(0, 1500),
             jobDescription,
             voiceSample,
+            marketContext,
           );
         } catch (e) {
           console.warn(`Full rewrite failed for ${key}:`, e.message);
