@@ -2,14 +2,14 @@
 @source "./tailwind-safelist.js";
 
 @theme {
-  /* Seevv brand colours — dark orange */
-  --color-brand-50: #fff3eb;
-  --color-brand-100: #ffd9b8;
-  --color-brand-200: #ffb07a;
-  --color-brand-400: #f07828;
-  --color-brand-600: #d95f0e;
-  --color-brand-800: #ad4500;
-  --color-brand-900: #7a3000;
+  /* Seevv brand colours — dark navy */
+  --color-brand-50: #e8eef7;
+  --color-brand-100: #c0d0e9;
+  --color-brand-200: #90aed7;
+  --color-brand-400: #2a5fa8;
+  --color-brand-600: #033876;
+  --color-brand-800: #022658;
+  --color-brand-900: #011538;
 
   /* Teal (success / match) */
   --color-teal-50: #e1f5ee;
@@ -74,16 +74,16 @@
 
   @keyframes shimmer-border {
     0% {
-      border-color: #d95f0e;
-      box-shadow: 0 0 0 0 rgba(217, 95, 14, 0.4);
+      border-color: #033876;
+      box-shadow: 0 0 0 0 rgba(3, 56, 118, 0.4);
     }
     50% {
       border-color: #1d9e75;
-      box-shadow: 0 0 0 6px rgba(217, 95, 14, 0);
+      box-shadow: 0 0 0 6px rgba(3, 56, 118, 0);
     }
     100% {
-      border-color: #d95f0e;
-      box-shadow: 0 0 0 0 rgba(217, 95, 14, 0);
+      border-color: #033876;
+      box-shadow: 0 0 0 0 rgba(3, 56, 118, 0);
     }
   }
 
@@ -120,10 +120,10 @@
 
   @keyframes pulse-ring {
     0%, 100% {
-      box-shadow: 0 0 0 0 rgba(217, 95, 14, 0.3);
+      box-shadow: 0 0 0 0 rgba(3, 56, 118, 0.3);
     }
     50% {
-      box-shadow: 0 0 0 8px rgba(217, 95, 14, 0);
+      box-shadow: 0 0 0 8px rgba(3, 56, 118, 0);
     }
   }
 }
@@ -174,7 +174,7 @@
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #d95f0e 0%, #f07828 50%, #1d9e75 100%);
+  background: linear-gradient(135deg, #033876 0%, #2a5fa8 50%, #1d9e75 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
