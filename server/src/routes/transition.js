@@ -78,7 +78,7 @@ router.post("/rewrite", async (req, res) => {
       targetIndustry
     );
 
-    res.json(result);
+    res.json({ rewrittenCV: result });
   } catch (err) {
     console.error("CV rewrite error:", err);
     res.status(500).json({ error: err.message });

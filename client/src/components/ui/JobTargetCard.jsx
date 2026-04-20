@@ -207,7 +207,7 @@ const JobTargetCard = ({ job, onStatusChange, onDelete }) => {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/cv?tailor=${job.id}`);
+              navigate("/cv");
             }}
             className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
           >

@@ -32,18 +32,45 @@ const generateContent = async (prompt, modelTier = "flash", options = {}) => {
         .replace(/```\n?/g, "")
         .trim();
 
+      // Try parsing as-is first
+      try {
+        return JSON.parse(cleaned);
+      } catch (_) {}
+
+      // Response was truncated — attempt structural repair
       let jsonStr = cleaned;
-      if (!jsonStr.endsWith("}")) {
-        const opens = (jsonStr.match(/{/g) || []).length;
-        const closes = (jsonStr.match(/}/g) || []).length;
-        const missing = opens - closes;
-        if (jsonStr.lastIndexOf("[") > jsonStr.lastIndexOf("]")) {
-          jsonStr += "]";
-        }
-        for (let i = 0; i < missing; i++) {
-          jsonStr += "}";
+
+      // If truncated mid-string value, close the string first
+      const quoteCount = (jsonStr.match(/(?<!\\)"/g) || []).length;
+      if (quoteCount % 2 !== 0) {
+        // Find the last complete key-value pair boundary and truncate there
+        const lastComma = jsonStr.lastIndexOf(",");
+        const lastColon = jsonStr.lastIndexOf(":");
+        // If the last colon is after the last comma we're mid-value — truncate to last comma
+        if (lastColon > lastComma) {
+          jsonStr = jsonStr.slice(0, lastComma);
+        } else {
+          jsonStr += '"';
         }
       }
+
+      // Close any unclosed arrays
+      const openArrays = (jsonStr.match(/\[/g) || []).length;
+      const closeArrays = (jsonStr.match(/\]/g) || []).length;
+      if (openArrays > closeArrays) {
+        // Remove trailing incomplete object if present (ends without closing })
+        const lastBrace = jsonStr.lastIndexOf("}");
+        const lastComma = jsonStr.lastIndexOf(",");
+        if (lastComma > lastBrace) {
+          jsonStr = jsonStr.slice(0, lastComma);
+        }
+        for (let i = 0; i < openArrays - closeArrays; i++) jsonStr += "]";
+      }
+
+      // Close any unclosed objects
+      const opens = (jsonStr.match(/{/g) || []).length;
+      const closes = (jsonStr.match(/}/g) || []).length;
+      for (let i = 0; i < opens - closes; i++) jsonStr += "}";
 
       return JSON.parse(jsonStr);
     } catch (err) {
@@ -107,7 +134,7 @@ Ranked by importance. Return ONLY valid JSON.
 
 Job description: ${jobDescription}`;
 
-  return generateContent(prompt, "flash", { json: true, temperature: 0.1 });
+  return generateContent(prompt, "flash", { json: true, temperature: 0.1, maxTokens: 1024 });
 };
 
 // ─── Rewrite a CV bullet point (legacy) ──────────────────
@@ -304,7 +331,7 @@ CV: ${cvText.slice(0, 2000)}
 
 Job description: ${jobDescription.slice(0, 1000)}`;
 
-  return generateContent(prompt, "flash", { json: true, temperature: 0.1 });
+  return generateContent(prompt, "flash", { json: true, temperature: 0.1, maxTokens: 1024 });
 };
 
 // ─── Generate a cover letter ──────────────────────────────
@@ -372,7 +399,7 @@ Find up to 5 blind spots. Return ONLY valid JSON.
 CV: ${cvText.slice(0, 3000)}
 Job description: ${jobDescription.slice(0, 500)}`;
 
-  return generateContent(prompt, "flash", { json: true, temperature: 0.3 });
+  return generateContent(prompt, "flash", { json: true, temperature: 0.3, maxTokens: 2048 });
 };
 
 // ─── Score how well a section matches a job ───────────────
@@ -446,18 +473,19 @@ Return a JSON object with this exact structure:
 }
 
 Rules:
-- Identify 8-15 skills total
+- Identify 8-12 skills total (no more than 12)
 - Be specific — "React" not "frontend frameworks"
 - closeness_score for green ≥ 75, amber 30-74, red < 30
-- Return ONLY valid JSON
+- Keep "demonstrated" and "gap" fields to max 15 words each
+- Return ONLY valid JSON, no markdown fences
 
 CV:
-${cvText.slice(0, 3000)}
+${cvText.slice(0, 2500)}
 
 Job description:
-${jobDescription.slice(0, 2000)}`;
+${jobDescription.slice(0, 1500)}`;
 
-  return generateContent(prompt, "pro", { json: true, temperature: 0.2, maxTokens: 4096 });
+  return generateContent(prompt, "pro", { json: true, temperature: 0.2, maxTokens: 8192 });
 };
 
 export const generateMicroProjects = async (gapSkills, jobDescription, userBackground) => {
@@ -496,7 +524,7 @@ Rules:
 
 `;
 
-  return generateContent(prompt, "pro", { json: true, temperature: 0.6, maxTokens: 4096 });
+  return generateContent(prompt, "pro", { json: true, temperature: 0.6, maxTokens: 8192 });
 };
 
 export const suggestCVBulletAfterProject = async (projectTitle, projectDescription, targetRole, existingCV) => {
@@ -544,9 +572,9 @@ Return a JSON array of claims:
   }
 ]
 
-Return 8-15 of the most important claims. Return ONLY valid JSON.`;
+Return 8-12 of the most important claims. Keep each field under 20 words. Return ONLY valid JSON.`;
 
-  return generateContent(prompt, "flash", { json: true, temperature: 0.2, maxTokens: 2048 });
+  return generateContent(prompt, "flash", { json: true, temperature: 0.2, maxTokens: 4096 });
 };
 
 // ─── 5.3 Company Intelligence Panel ───────────────────────
@@ -584,7 +612,7 @@ Rules:
 - prep_tips: role and company specific, not generic advice
 - Return ONLY valid JSON`;
 
-  return generateContent(prompt, "pro", { json: true, temperature: 0.3, maxTokens: 4096 });
+  return generateContent(prompt, "pro", { json: true, temperature: 0.3, maxTokens: 8192 });
 };
 
 // ─── 5.4 Industry Transition Mode ─────────────────────────
@@ -602,35 +630,35 @@ ${cvText.slice(0, 2500)}
 Analyse their transition potential and return a JSON object:
 {
   "readiness_score": 0-100,
-  "transition_narrative": "3-4 sentence narrative framing their transition story positively",
+  "transition_narrative": "2-3 sentence narrative framing their transition story positively",
   "transferable_skills": [
     {
-      "skill": "universal skill name",
-      "origin_term": "how it's described in their current industry",
-      "target_term": "how it should be described in the target industry",
+      "skill": "skill name",
+      "origin_term": "term used in current industry (max 6 words)",
+      "target_term": "equivalent in target industry (max 6 words)",
       "strength": "strong|moderate|weak",
-      "evidence": "specific evidence from their CV"
+      "evidence": "one specific example from CV (max 12 words)"
     }
   ],
   "vocabulary_map": [
     {
-      "origin_phrase": "phrase used in CV or origin sector",
-      "target_phrase": "equivalent phrase in target industry",
-      "rationale": "why this reframing works"
+      "origin_phrase": "phrase from CV/origin sector (max 5 words)",
+      "target_phrase": "equivalent in target industry (max 5 words)",
+      "rationale": "why this reframing works (max 10 words)"
     }
   ],
-  "key_gaps": ["gap 1", "gap 2"],
-  "quick_wins": ["thing they can do immediately to strengthen their candidacy"],
-  "recommended_positioning": "how they should position themselves in the target industry"
+  "key_gaps": ["gap 1", "gap 2", "gap 3"],
+  "quick_wins": ["action 1", "action 2", "action 3"],
+  "recommended_positioning": "one sentence on how to position themselves"
 }
 
 Rules:
-- transferable_skills: find 5-8 skills
-- vocabulary_map: identify 5-8 vocabulary translations
-- Be specific to the actual industries, not generic
-- Return ONLY valid JSON`;
+- transferable_skills: exactly 5 skills
+- vocabulary_map: exactly 5 translations
+- Keep ALL string values concise — this is machine-read, not prose
+- Return ONLY valid JSON, no markdown fences`;
 
-  return generateContent(prompt, "pro", { json: true, temperature: 0.4, maxTokens: 6144 });
+  return generateContent(prompt, "pro", { json: true, temperature: 0.4, maxTokens: 8192 });
 };
 
 export const rewriteCVForTransition = async (cvText, vocabularyMap, targetRole, targetIndustry) => {
@@ -696,37 +724,37 @@ export const generateInterviewPrepSheet = async (cvText, jobDescription, company
 Job: ${jobTitle} at ${companyName}
 ${companyContext}
 ${marketContext ? `\n${marketContext}` : ""}
-Candidate's CV (summarised):
-${cvText.slice(0, 2500)}
+Candidate's CV:
+${cvText.slice(0, 2000)}
 
 Job description:
-${jobDescription.slice(0, 1200)}
+${jobDescription.slice(0, 1000)}
 
-Return a JSON object:
+Return a JSON object with EXACTLY this structure — keep all string values concise (max 25 words each):
 {
   "likely_questions": [
     {
-      "question": "string — a specific behavioural or competency question grounded in this CV and JD",
-      "type": "behavioural | technical | situational | motivation",
-      "why_theyll_ask": "string — why this question is relevant to this specific role",
+      "question": "specific question referencing their CV or this JD",
+      "type": "behavioural|technical|situational|motivation",
+      "why_theyll_ask": "one sentence — why relevant to this role",
       "star_talking_points": {
-        "situation": "string — a specific situation from their CV to draw on",
-        "task": "string — the task or challenge",
-        "action": "string — concrete actions they could highlight",
-        "result": "string — the outcome or metric to emphasise"
+        "situation": "CV situation to draw on (max 15 words)",
+        "task": "the challenge (max 12 words)",
+        "action": "key actions to highlight (max 15 words)",
+        "result": "outcome or metric to emphasise (max 12 words)"
       },
-      "danger_zone": "string — what a weak answer looks like and how to avoid it"
+      "danger_zone": "what a weak answer looks like (max 15 words)"
     }
   ],
-  "company_research_angles": ["string — specific angle to research about this company before the interview"],
-  "questions_to_ask_them": ["string — smart question the candidate should ask the interviewer"],
-  "positioning_statement": "string — 2-3 sentence opening answer to 'Tell me about yourself' drawn from their actual CV",
-  "watch_out_for": ["string — potential red flags in their CV they should be ready to address"]
+  "company_research_angles": ["angle 1", "angle 2", "angle 3"],
+  "questions_to_ask_them": ["question 1", "question 2", "question 3"],
+  "positioning_statement": "2-sentence 'tell me about yourself' drawn from their actual CV",
+  "watch_out_for": ["red flag 1", "red flag 2"]
 }
 
-Generate 6 likely questions. Return ONLY valid JSON.`;
+Generate exactly 5 likely_questions. Return ONLY valid JSON, no markdown.`;
 
-  return generateContent(prompt, "pro", { json: true, temperature: 0.5 });
+  return generateContent(prompt, "pro", { json: true, temperature: 0.5, maxTokens: 8192 });
 };
 
 // 6.1.1 Generate stress-test mock interview questions from tailored CV
@@ -737,29 +765,28 @@ Generate 5 stress-test interview questions based ONLY on what is in this candida
 Each question must probe for genuine depth by referencing a specific claim, achievement, or experience from their CV.
 ${marketContext ? `\n${marketContext}` : ""}
 CV:
-${cvText.slice(0, 2500)}
+${cvText.slice(0, 2000)}
 
 Job description context:
-${jobDescription.slice(0, 600)}
+${jobDescription.slice(0, 500)}
 
-Return a JSON array:
+Return a JSON array with exactly 5 items — keep all string values concise (max 30 words each):
 [
   {
     "id": 1,
-    "question": "string — specific, probing question referencing their actual CV content",
-    "cv_reference": "string — the exact part of their CV this question targets",
-    "what_good_looks_like": "string — what a strong answer includes",
-    "follow_up": "string — the follow-up probe if their answer is vague"
+    "question": "specific probing question referencing their actual CV (max 30 words)",
+    "cv_reference": "exact CV claim this targets (max 15 words)",
+    "what_good_looks_like": "what a strong answer includes (max 20 words)",
+    "follow_up": "follow-up probe if answer is vague (max 20 words)"
   }
 ]
 
 Rules:
-- Questions must be specific to THIS person's CV — never generic
-- Mix of challenge questions, depth probes, and clarification questions
-- One question must challenge a potential weakness or gap in their CV
-- Return ONLY valid JSON array with exactly 5 questions`;
+- Questions must reference THIS person's CV specifically — never generic
+- One question must challenge a potential weakness or gap
+- Return ONLY a valid JSON array, no markdown`;
 
-  return generateContent(prompt, "pro", { json: true, temperature: 0.4 });
+  return generateContent(prompt, "pro", { json: true, temperature: 0.4, maxTokens: 4096 });
 };
 
 // 6.1.2 Score a mock interview answer for confidence, clarity, substance
@@ -768,10 +795,10 @@ export const scoreMockInterviewAnswer = async (question, answer, cvReference, jo
 
 Role: ${jobTitle}
 Question: "${question}"
-CV context this question targets: "${cvReference}"
+CV context: "${cvReference}"
 Candidate's answer: "${answer}"
 
-Evaluate the answer and return a JSON object:
+Return a JSON object — keep string values concise (max 30 words each):
 {
   "readiness_score": 0-100,
   "scores": {
@@ -780,16 +807,16 @@ Evaluate the answer and return a JSON object:
     "specificity": 0-100,
     "confidence_tone": 0-100
   },
-  "verdict": "string — one sentence overall verdict",
-  "strengths": ["string — what they did well"],
-  "improvements": ["string — specific, actionable coaching note"],
-  "model_answer_snippet": "string — a 2-3 sentence example of what a strong opening to this answer sounds like",
-  "missing_elements": ["string — key element a strong answer would include but theirs didn't"]
+  "verdict": "one sentence overall verdict",
+  "strengths": ["what they did well (max 2 items)"],
+  "improvements": ["specific actionable coaching note (max 2 items)"],
+  "model_answer_snippet": "2-sentence example of a strong opening for this answer",
+  "missing_elements": ["key element missing (max 2 items)"]
 }
 
-Be honest but constructive. Return ONLY valid JSON.`;
+Be honest but constructive. Return ONLY valid JSON, no markdown.`;
 
-  return generateContent(prompt, "pro", { json: true, temperature: 0.3 });
+  return generateContent(prompt, "pro", { json: true, temperature: 0.3, maxTokens: 2048 });
 };
 
 // 6.3 Generate analytics insight from CV version performance data
@@ -828,9 +855,9 @@ Return a JSON object with this exact structure:
 }
 
 Scoring guide: 90-100 = expert evidence, 70-89 = strong evidence, 50-69 = some evidence, 30-49 = mentioned only.
-Return up to 8 skills per category. Return ONLY valid JSON.`;
+Return up to 6 skills per category. Keep "summary" under 30 words. Return ONLY valid JSON.`;
 
-  return generateContent(prompt, "flash", { json: true, temperature: 0.2, maxTokens: 2048 });
+  return generateContent(prompt, "flash", { json: true, temperature: 0.2, maxTokens: 4096 });
 };
 
 // ─── Recruiter mode: rank candidates ──────────────────────
@@ -885,7 +912,7 @@ Return a JSON object:
 
 Return ONLY valid JSON.`;
 
-  return generateContent(prompt, "flash", { json: true, temperature: 0.3 });
+  return generateContent(prompt, "flash", { json: true, temperature: 0.3, maxTokens: 2048 });
 };
 
 export default {

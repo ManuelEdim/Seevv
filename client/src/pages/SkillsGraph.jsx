@@ -77,14 +77,14 @@ const RadarChart = ({ skills }) => {
       {/* Data polygon */}
       <polygon
         points={polyStr}
-        fill="rgba(217, 95, 14, 0.15)"
-        stroke="#d95f0e"
+        fill="rgba(3, 56, 118, 0.12)"
+        stroke="#033876"
         strokeWidth="2"
         strokeLinejoin="round"
       />
       {/* Data points */}
       {polygon.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r="3" fill="#d95f0e" />
+        <circle key={i} cx={p.x} cy={p.y} r="3" fill="#033876" />
       ))}
       {/* Labels */}
       {items.map((s, i) => {
@@ -165,7 +165,7 @@ const SkillsGraph = () => {
         <Card padding="md">
           <div className="text-center py-8 space-y-4">
             <div className="w-14 h-14 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d95f0e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#033876" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
               </svg>
             </div>

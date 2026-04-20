@@ -38,15 +38,23 @@ router.post("/score", async (req, res) => {
     const results = await Promise.all(
       jobs.map(async (job) => {
         try {
-          const score = await quickScoreCV(cv.raw_text, job.job_description);
-          return { jobId: job.id, jobTitle: job.job_title, company: job.company_name, ...score };
+          const score = await quickScoreCV(cv.raw_text, job.job_description || "");
+          return {
+            jobId: job.id,
+            jobTitle: job.job_title,
+            company: job.company_name,
+            overall_score: score.match_score || score.overall_score || 0,
+            verdict: score.recommendation || score.verdict || "",
+            top_gaps: score.top_gaps || [],
+            quick_wins: score.top_strengths || score.quick_wins || [],
+          };
         } catch {
           return {
             jobId: job.id,
             jobTitle: job.job_title,
             company: job.company_name,
             overall_score: 0,
-            verdict: "Error",
+            verdict: "Scoring failed",
             top_gaps: [],
             quick_wins: [],
             error: true,

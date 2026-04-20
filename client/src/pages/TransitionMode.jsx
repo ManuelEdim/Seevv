@@ -4,27 +4,15 @@ import api from "@/lib/api";
 import useJobTargets from "@/hooks/useJobTargets";
 
 const COMMON_INDUSTRIES = [
-  "Finance",
-  "Technology",
-  "Healthcare",
-  "Marketing",
-  "Education",
-  "Consulting",
-  "Law",
-  "Engineering",
-  "Product Management",
-  "Operations",
-  "Sales",
-  "Design",
-  "Non-profit",
-  "Government",
+  "Finance", "Technology", "Healthcare", "Marketing", "Education",
+  "Consulting", "Law", "Engineering", "Product Management", "Operations",
+  "Sales", "Design", "Non-profit", "Government",
 ];
 
-// ─── Transferability badge ─────────────────────────────────
-const transferColor = {
-  high: "bg-teal-50 text-teal-800 border-teal-200",
-  medium: "bg-amber-50 text-amber-800 border-amber-200",
-  low: "bg-coral-50 text-coral-800 border-coral-200",
+const strengthColor = {
+  strong: "bg-teal-50 text-teal-800 border-teal-200",
+  moderate: "bg-amber-50 text-amber-800 border-amber-200",
+  weak: "bg-coral-50 text-coral-800 border-coral-200",
 };
 
 // ─── Analysis result view ──────────────────────────────────
@@ -41,8 +29,20 @@ const TransitionAnalysis = ({ result, onRewrite, isRewriting }) => (
           <span className="text-sm font-normal text-brand-500">/100</span>
         </span>
       </div>
-      <p className="text-sm text-brand-900 leading-relaxed">{result.summary}</p>
+      <p className="text-sm text-brand-900 leading-relaxed">
+        {result.transition_narrative || result.summary}
+      </p>
     </div>
+
+    {/* Recommended positioning */}
+    {result.recommended_positioning && (
+      <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          How to position yourself
+        </p>
+        <p className="text-sm text-gray-700">{result.recommended_positioning}</p>
+      </div>
+    )}
 
     {/* Transferable skills */}
     {result.transferable_skills?.length > 0 && (
@@ -54,54 +54,66 @@ const TransitionAnalysis = ({ result, onRewrite, isRewriting }) => (
           {result.transferable_skills.map((skill, i) => (
             <div
               key={i}
-              className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
-                transferColor[skill.transferability] || transferColor.medium
+              className={`rounded-xl border px-3 py-2.5 ${
+                strengthColor[skill.strength] || strengthColor.moderate
               }`}
             >
-              <p className="text-sm font-medium">{skill.skill}</p>
-              <span className="text-xs capitalize">
-                {skill.transferability}
-              </span>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">{skill.skill}</p>
+                <span className="text-xs font-semibold capitalize shrink-0">
+                  {skill.strength}
+                </span>
+              </div>
+              {(skill.origin_term || skill.target_term) && (
+                <p className="text-xs opacity-70 mt-1">
+                  {skill.origin_term} → {skill.target_term}
+                </p>
+              )}
+              {skill.evidence && (
+                <p className="text-xs opacity-60 mt-0.5 italic">{skill.evidence}</p>
+              )}
             </div>
           ))}
         </div>
       </div>
     )}
 
-    {/* Vocabulary map */}
-    {result.vocabulary_map && Object.keys(result.vocabulary_map).length > 0 && (
+    {/* Vocabulary map — API returns array */}
+    {result.vocabulary_map?.length > 0 && (
       <div>
         <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
           Language bridge (old → new industry terms)
         </p>
         <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
-          {Object.entries(result.vocabulary_map).map(([from, to], i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+          {result.vocabulary_map.map((item, i) => (
+            <div key={i} className="flex items-start gap-3 px-4 py-2.5">
               <span className="text-sm text-gray-500 line-through flex-1">
-                {from}
+                {item.origin_phrase}
               </span>
-              <span className="text-gray-300">→</span>
-              <span className="text-sm font-medium text-gray-900 flex-1">
-                {to}
-              </span>
+              <span className="text-gray-300 shrink-0">→</span>
+              <div className="flex-1">
+                <span className="text-sm font-medium text-gray-900">
+                  {item.target_phrase}
+                </span>
+                {item.rationale && (
+                  <p className="text-xs text-gray-400 mt-0.5">{item.rationale}</p>
+                )}
+              </div>
             </div>
           ))}
         </div>
       </div>
     )}
 
-    {/* Gaps to address */}
-    {result.gaps_to_address?.length > 0 && (
+    {/* Key gaps */}
+    {(result.key_gaps || result.gaps_to_address)?.length > 0 && (
       <div>
         <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
           Gaps to address
         </p>
         <ul className="space-y-1">
-          {result.gaps_to_address.map((g, i) => (
-            <li
-              key={i}
-              className="text-sm text-gray-700 flex items-start gap-2"
-            >
+          {(result.key_gaps || result.gaps_to_address).map((g, i) => (
+            <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
               <span className="text-coral-400 mt-0.5 shrink-0">✗</span>
               {g}
             </li>
@@ -110,14 +122,14 @@ const TransitionAnalysis = ({ result, onRewrite, isRewriting }) => (
       </div>
     )}
 
-    {/* Action plan */}
-    {result.action_plan?.length > 0 && (
+    {/* Quick wins / action plan */}
+    {(result.quick_wins || result.action_plan)?.length > 0 && (
       <div className="bg-amber-50 rounded-xl border border-amber-100 p-4">
         <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-3">
-          90-day action plan
+          Quick wins to strengthen candidacy
         </p>
         <div className="space-y-2">
-          {result.action_plan.map((step, i) => (
+          {(result.quick_wins || result.action_plan).map((step, i) => (
             <div key={i} className="flex items-start gap-2">
               <div className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center shrink-0 mt-0.5">
                 <span className="text-white text-xs font-bold">{i + 1}</span>
@@ -130,7 +142,7 @@ const TransitionAnalysis = ({ result, onRewrite, isRewriting }) => (
     )}
 
     {/* Rewrite CV button */}
-    {result.vocabulary_map && (
+    {result.vocabulary_map?.length > 0 && (
       <Button
         variant="primary"
         fullWidth
@@ -143,8 +155,8 @@ const TransitionAnalysis = ({ result, onRewrite, isRewriting }) => (
   </div>
 );
 
-// ─── Rewritten CV view ─────────────────────────────────────
-const RewrittenCV = ({ result, onBack }) => (
+// ─── Rewritten CV view — backend returns plain text ────────
+const RewrittenCV = ({ text, onBack }) => (
   <div className="space-y-4">
     <div className="flex items-center justify-between">
       <p className="text-sm font-semibold text-gray-900">Rewritten CV</p>
@@ -156,51 +168,18 @@ const RewrittenCV = ({ result, onBack }) => (
       </button>
     </div>
 
-    {result.rewritten_sections?.map((section, i) => (
-      <div
-        key={i}
-        className="bg-white rounded-xl border border-gray-100 p-4 space-y-2"
-      >
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          {section.section}
-        </p>
-        <div className="grid grid-cols-1 gap-2">
-          {section.bullets?.map((b, j) => (
-            <div key={j} className="bg-gray-50 rounded-lg p-3 group relative">
-              <p className="text-sm text-gray-700 leading-relaxed">{b}</p>
-              <button
-                onClick={() => navigator.clipboard.writeText(b)}
-                className="absolute top-2 right-2 text-xs text-gray-300 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-              >
-                Copy
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    ))}
-
-    {result.positioning_statement && (
-      <div className="bg-brand-50 rounded-2xl border border-brand-100 p-4">
-        <p className="text-xs font-semibold text-brand-800 uppercase tracking-wide mb-2">
-          Positioning statement
-        </p>
-        <p className="text-sm text-brand-900 leading-relaxed">
-          {result.positioning_statement}
-        </p>
-      </div>
-    )}
+    <div className="bg-white rounded-xl border border-gray-100 p-5">
+      <pre className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap font-sans">
+        {text}
+      </pre>
+    </div>
 
     <Button
       variant="outline"
       fullWidth
-      onClick={() =>
-        navigator.clipboard.writeText(
-          result.rewritten_sections?.flatMap((s) => s.bullets || []).join("\n"),
-        )
-      }
+      onClick={() => navigator.clipboard.writeText(text)}
     >
-      Copy all bullets
+      Copy rewritten CV
     </Button>
   </div>
 );
@@ -214,15 +193,13 @@ const TransitionMode = () => {
   const [customOrigin, setCustomOrigin] = useState("");
   const [customTarget, setCustomTarget] = useState("");
 
-  const [step, setStep] = useState("form"); // form | analyzing | result | rewriting | rewritten
+  const [step, setStep] = useState("form");
   const [analysis, setAnalysis] = useState(null);
   const [rewritten, setRewritten] = useState(null);
   const [error, setError] = useState(null);
 
-  const origin =
-    originIndustry === "__custom__" ? customOrigin : originIndustry;
-  const target =
-    targetIndustry === "__custom__" ? customTarget : targetIndustry;
+  const origin = originIndustry === "__custom__" ? customOrigin : originIndustry;
+  const target = targetIndustry === "__custom__" ? customTarget : targetIndustry;
 
   const handleAnalyze = async () => {
     if (!origin || !target) return;
@@ -237,7 +214,7 @@ const TransitionMode = () => {
       setAnalysis(data);
       setStep("result");
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
       setStep("form");
     }
   };
@@ -248,13 +225,14 @@ const TransitionMode = () => {
     try {
       const data = await api.post("/transition/rewrite", {
         vocabularyMap,
-        targetRole: analysis?.target_role || target,
+        targetRole: analysis?.recommended_positioning || target,
         targetIndustry: target,
       });
-      setRewritten(data);
+      // Backend returns plain text wrapped in { rewrittenCV: "..." }
+      setRewritten(typeof data === "string" ? data : data.rewrittenCV || JSON.stringify(data));
       setStep("rewritten");
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message);
       setStep("result");
     }
   };
@@ -262,12 +240,9 @@ const TransitionMode = () => {
   return (
     <div className="mx-auto space-y-4">
       <div>
-        <h1 className="text-lg font-bold text-gray-900">
-          Industry Transition Mode
-        </h1>
+        <h1 className="text-lg font-bold text-gray-900">Industry Transition Mode</h1>
         <p className="text-xs text-gray-400 mt-0.5">
-          Bridge the language gap between industries and get your CV rewritten
-          for a new sector.
+          Bridge the language gap between industries and get your CV rewritten for a new sector.
         </p>
       </div>
 
@@ -286,9 +261,7 @@ const TransitionMode = () => {
               >
                 <option value="">Select your current industry…</option>
                 {COMMON_INDUSTRIES.map((ind) => (
-                  <option key={ind} value={ind}>
-                    {ind}
-                  </option>
+                  <option key={ind} value={ind}>{ind}</option>
                 ))}
                 <option value="__custom__">Other (type below)</option>
               </select>
@@ -314,9 +287,7 @@ const TransitionMode = () => {
               >
                 <option value="">Select your target industry…</option>
                 {COMMON_INDUSTRIES.map((ind) => (
-                  <option key={ind} value={ind}>
-                    {ind}
-                  </option>
+                  <option key={ind} value={ind}>{ind}</option>
                 ))}
                 <option value="__custom__">Other (type below)</option>
               </select>
@@ -333,7 +304,7 @@ const TransitionMode = () => {
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Target job (optional)
+                Target job (optional — improves analysis)
               </label>
               <select
                 value={selectedJobId}
@@ -367,9 +338,7 @@ const TransitionMode = () => {
           <div className="flex flex-col items-center py-10 gap-4">
             <Spinner size="lg" />
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-700">
-                Mapping your transition…
-              </p>
+              <p className="text-sm font-medium text-gray-700">Mapping your transition…</p>
               <p className="text-xs text-gray-400 mt-1">
                 Identifying transferable skills and vocabulary bridges
               </p>
@@ -405,9 +374,7 @@ const TransitionMode = () => {
         <Card padding="md">
           <div className="flex flex-col items-center py-10 gap-4">
             <Spinner size="lg" />
-            <p className="text-sm text-gray-500">
-              Rewriting your CV for {target}…
-            </p>
+            <p className="text-sm text-gray-500">Rewriting your CV for {target}…</p>
           </div>
         </Card>
       )}
@@ -415,7 +382,7 @@ const TransitionMode = () => {
       {/* Rewritten CV */}
       {step === "rewritten" && rewritten && (
         <Card padding="md">
-          <RewrittenCV result={rewritten} onBack={() => setStep("result")} />
+          <RewrittenCV text={rewritten} onBack={() => setStep("result")} />
         </Card>
       )}
 
