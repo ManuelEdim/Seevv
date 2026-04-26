@@ -5,6 +5,7 @@ import useCoverLetter from "@/hooks/useCoverLetter";
 import { useToast } from "@/context/ToastContext";
 import { SuccessBanner } from "@/components/ui";
 import useSuccessAnimation from "@/hooks/useSuccessAnimation";
+import { supabase } from "@/lib/supabase";
 
 // ─── Tone config ──────────────────────────────────────────
 
@@ -125,6 +126,7 @@ const CoverLetter = () => {
   const [selectedJobId, setSelectedJobId] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const {
     isAnimating,
@@ -136,6 +138,7 @@ const CoverLetter = () => {
     job,
     jobs,
     jobId,
+    coverLetter,
     content,
     tone,
     wordCount,
@@ -179,6 +182,39 @@ const CoverLetter = () => {
       setIsSaved(true);
     } catch (err) {
       toast.error(err.message || "Failed to save.");
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!coverLetter?.id) {
+      toast.warning("Save your cover letter first before exporting.");
+      return;
+    }
+    setIsExportingPdf(true);
+    toast.info("Generating PDF — this takes a few seconds…");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/export/cover-letter/pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ letterId: coverLetter.id }),
+      });
+      if (!response.ok) { const e = await response.json(); throw new Error(e.error || "Export failed"); }
+      const disposition = response.headers.get("Content-Disposition");
+      const match = disposition?.match(/filename="([^"]+)"/);
+      const fileName = match ? match[1] : "Cover Letter.pdf";
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+      toast.success("PDF downloaded!");
+    } catch (err) {
+      toast.error(err.message || "Failed to export PDF.");
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -656,7 +692,8 @@ const CoverLetter = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => toast.info("PDF export coming soon")}
+                onClick={handleExportPdf}
+                isLoading={isExportingPdf}
               >
                 Export PDF
               </Button>
@@ -701,7 +738,8 @@ const CoverLetter = () => {
             <Button
               variant="outline"
               fullWidth
-              onClick={() => toast.info("PDF export coming soon")}
+              onClick={handleExportPdf}
+              isLoading={isExportingPdf}
             >
               Export as PDF
             </Button>

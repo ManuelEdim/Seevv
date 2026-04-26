@@ -45,13 +45,13 @@ const loadDraft = () => {
 const saveDraft = (values) => {
   try {
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify(values));
-  } catch {}
+  } catch { /* sessionStorage unavailable */ }
 };
 
 const clearDraft = () => {
   try {
     sessionStorage.removeItem(DRAFT_KEY);
-  } catch {}
+  } catch { /* sessionStorage unavailable */ }
 };
 
 // ── Text extraction helpers ──────────────────────────────────────────────────
@@ -222,7 +222,7 @@ const AddJobModal = ({
         setIsExtracting(false);
       }
     },
-    [setValue, toast],
+    [setValue, toast, smartFillFields],
   );
 
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({

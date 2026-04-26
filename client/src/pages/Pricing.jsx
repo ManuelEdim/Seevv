@@ -1,23 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui";
 import { useToast } from "@/context/ToastContext";
+import useAuthStore from "@/store/authStore";
+import api from "@/lib/api";
 
 // ─── Currency config ───────────────────────────────────────
 const currencies = [
-  { code: "USD", symbol: "$", label: "USD", rates: { monthly: 1, annual: 1 } },
-  { code: "GBP", symbol: "£", label: "GBP", rates: { monthly: 0.79, annual: 0.79 } },
-  { code: "NGN", symbol: "₦", label: "NGN", rates: { monthly: 1600, annual: 1600 } },
+  { code: "USD", symbol: "$", label: "USD" },
+  { code: "GBP", symbol: "£", label: "GBP" },
+  { code: "NGN", symbol: "₦", label: "NGN" },
 ];
 
-const formatPrice = (usdPrice, currency, billing) => {
-  if (usdPrice === 0) return `${currency.symbol}0`;
-  const rate = currency.rates[billing];
-  const converted = usdPrice * rate;
-  if (currency.code === "NGN") {
-    return `${currency.symbol}${Math.round(converted / 100) * 100}`;
-  }
-  return `${currency.symbol}${Math.round(converted)}`;
+// Prices per plan per currency (monthly USD base; NGN fixed; GBP converted)
+const PRICE_MAP = {
+  starter: { USD: 9,  GBP: 7,  NGN: 4000  },
+  pro:     { USD: 19, GBP: 15, NGN: 9000  },
+  pro_plus:{ USD: 39, GBP: 29, NGN: 18000 },
+};
+
+// Paystack plan keys — maps planId + currency to the key the backend uses
+const PAYSTACK_KEY = {
+  starter: { USD: "starter_usd", GBP: "starter_gbp", NGN: "starter_ngn" },
+  pro:     { USD: "pro_usd",     GBP: "pro_gbp",     NGN: "pro_ngn"     },
+  pro_plus:{ USD: "pro_plus_usd",GBP: "pro_plus_gbp",NGN: "pro_plus_ngn"},
+};
+
+const formatPrice = (planId, currencyCode, billing) => {
+  const base = PRICE_MAP[planId];
+  if (!base) return "Free";
+  const sym = currencies.find((c) => c.code === currencyCode)?.symbol || "$";
+  const price = billing === "annual"
+    ? Math.round(base[currencyCode] * 0.75)
+    : base[currencyCode];
+  if (currencyCode === "NGN") return `${sym}${price.toLocaleString()}`;
+  return `${sym}${price}`;
+};
+
+const formatOriginalPrice = (planId, currencyCode) => {
+  const base = PRICE_MAP[planId];
+  if (!base) return null;
+  const sym = currencies.find((c) => c.code === currencyCode)?.symbol || "$";
+  if (currencyCode === "NGN") return `${sym}${base[currencyCode].toLocaleString()}`;
+  return `${sym}${base[currencyCode]}`;
 };
 
 // ─── Plan definitions ──────────────────────────────────────
@@ -25,7 +50,6 @@ const plans = [
   {
     id: "free",
     name: "Free",
-    price: { monthly: 0, annual: 0 },
     description: "Explore the core features at no cost.",
     accent: "border-gray-200",
     highlight: false,
@@ -43,14 +67,12 @@ const plans = [
       "Company Intelligence Panel",
       "Industry Transition Mode",
       "Speed Mode",
-      "Voice mirroring",
       "Interview Prep & Mock Interview",
     ],
   },
   {
     id: "starter",
     name: "Starter",
-    price: { monthly: 9, annual: 7 },
     description: "For active job seekers targeting multiple roles.",
     accent: "border-brand-200",
     highlight: false,
@@ -76,7 +98,6 @@ const plans = [
   {
     id: "pro",
     name: "Pro",
-    price: { monthly: 19, annual: 15 },
     badge: "Most popular",
     description: "The full intelligence layer for serious job seekers.",
     accent: "border-brand-600",
@@ -98,7 +119,6 @@ const plans = [
   {
     id: "pro_plus",
     name: "Pro+",
-    price: { monthly: 39, annual: 29 },
     badge: "Teams & power users",
     description: "For professionals who apply at scale or want every edge.",
     accent: "border-amber-400",
@@ -137,14 +157,11 @@ const ChevronIcon = ({ open }) => (
 );
 
 // ─── Plan card ─────────────────────────────────────────────
-const PlanCard = ({ plan, isCurrentPlan, billing, currency, onSelect }) => {
-  const priceDisplay = formatPrice(
-    billing === "annual" ? plan.price.annual : plan.price.monthly,
-    currency,
-    billing,
-  );
-  const originalDisplay = billing === "annual" && plan.price.monthly > 0
-    ? formatPrice(plan.price.monthly, currency, billing)
+const PlanCard = ({ plan, isCurrentPlan, billing, currencyCode, onSelect, isLoading }) => {
+  const isFree = plan.id === "free";
+  const priceDisplay = isFree ? "Free" : formatPrice(plan.id, currencyCode, billing);
+  const originalDisplay = !isFree && billing === "annual"
+    ? formatOriginalPrice(plan.id, currencyCode)
     : null;
 
   return (
@@ -158,31 +175,24 @@ const PlanCard = ({ plan, isCurrentPlan, billing, currency, onSelect }) => {
       )}
 
       <div className="p-6 flex-1">
-        {/* Plan name + description */}
         <div className="mb-5">
           <h3 className="text-base font-bold text-gray-900">{plan.name}</h3>
           <p className="text-xs text-gray-400 mt-1 leading-relaxed">{plan.description}</p>
         </div>
 
-        {/* Price */}
         <div className="mb-6 pb-5 border-b border-gray-50">
           <div className="flex items-baseline gap-1">
             <span className="text-4xl font-bold text-gray-900">{priceDisplay}</span>
-            {plan.price.monthly > 0 && (
-              <span className="text-sm text-gray-400">/mo</span>
-            )}
+            {!isFree && <span className="text-sm text-gray-400">/mo</span>}
           </div>
-          {billing === "annual" && plan.price.monthly > 0 && (
+          {billing === "annual" && !isFree && (
             <p className="text-xs text-teal-600 font-medium mt-1">
               Billed annually · was {originalDisplay}/mo
             </p>
           )}
-          {plan.price.monthly === 0 && (
-            <p className="text-xs text-gray-400 mt-1">Free forever</p>
-          )}
+          {isFree && <p className="text-xs text-gray-400 mt-1">Free forever</p>}
         </div>
 
-        {/* Features */}
         <ul className="space-y-2.5">
           {plan.features.map((f, i) => (
             <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
@@ -203,8 +213,9 @@ const PlanCard = ({ plan, isCurrentPlan, billing, currency, onSelect }) => {
         <Button
           variant={plan.highlight && !isCurrentPlan ? "primary" : "outline"}
           fullWidth
-          disabled={isCurrentPlan}
-          onClick={() => !isCurrentPlan && onSelect(plan.id)}
+          disabled={isCurrentPlan || (isFree && !isCurrentPlan)}
+          isLoading={isLoading}
+          onClick={() => !isCurrentPlan && !isFree && onSelect(plan.id)}
         >
           {isCurrentPlan ? "Current plan" : plan.cta}
         </Button>
@@ -213,7 +224,7 @@ const PlanCard = ({ plan, isCurrentPlan, billing, currency, onSelect }) => {
   );
 };
 
-// ─── FAQ accordion item ────────────────────────────────────
+// ─── FAQ ───────────────────────────────────────────────────
 const faqItems = [
   {
     q: "Can I cancel or downgrade at any time?",
@@ -225,15 +236,15 @@ const faqItems = [
   },
   {
     q: "Is there a free trial for Pro?",
-    a: "The Free plan lets you test all core features before committing. When billing launches, Pro will include a 7-day money-back guarantee.",
+    a: "The Free plan lets you test all core features before committing. Pro includes a 7-day money-back guarantee.",
   },
   {
     q: "What payment methods are supported?",
-    a: "Card (Visa, Mastercard), Apple Pay, and Google Pay globally. Nigerian users can pay via Paystack with local card, bank transfer, or USSD — launching soon.",
+    a: "Card (Visa, Mastercard), Apple Pay, Google Pay, bank transfer, and USSD — all supported via Paystack. Nigerian users pay in Naira with zero FX fees.",
   },
   {
     q: "Are prices shown in my currency?",
-    a: "You can switch between USD, GBP, and NGN using the currency selector above. Nigerian pricing via Paystack is fixed at the NGN rate shown — no hidden FX fees.",
+    a: "Yes — switch between USD, GBP, and NGN using the currency selector. Nigerian pricing is fixed at the Naira rate shown, no hidden FX charges.",
   },
   {
     q: "Is my data sold to recruiters or third parties?",
@@ -261,19 +272,90 @@ const FAQItem = ({ item }) => {
   );
 };
 
+// ─── Load Paystack inline script once ─────────────────────
+const usePaystackScript = () => {
+  const [ready, setReady] = useState(!!window.PaystackPop);
+  useEffect(() => {
+    if (window.PaystackPop) return;
+    const script = document.createElement("script");
+    script.src = "https://js.paystack.co/v1/inline.js";
+    script.async = true;
+    script.onload = () => setReady(true);
+    document.head.appendChild(script);
+  }, []);
+  return ready;
+};
+
 // ─── Pricing page ──────────────────────────────────────────
 const Pricing = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const user = useAuthStore((s) => s.user);
+  const paystackReady = usePaystackScript();
+
   const [billing, setBilling] = useState("monthly");
-  const [currencyCode, setCurrencyCode] = useState("USD");
+  const [currencyCode, setCurrencyCode] = useState("NGN");
+  const [loadingPlan, setLoadingPlan] = useState(null);
 
-  const currency = currencies.find((c) => c.code === currencyCode);
-  const currentPlan = "free";
+  const currentPlan = user?.plan || "free";
 
-  const handleSelect = (planId) => {
-    toast.info(`Billing coming soon — ${planId} plan selected. We'll notify you when payments go live.`);
-  };
+  const handleSelect = useCallback(async (planId) => {
+    if (!user) {
+      toast.info("Please log in to upgrade your plan.");
+      navigate("/login");
+      return;
+    }
+    if (!paystackReady) {
+      toast.error("Payment system is loading, please try again in a moment.");
+      return;
+    }
+
+    const planKey = PAYSTACK_KEY[planId]?.[currencyCode];
+    if (!planKey) {
+      toast.error("This plan/currency combination is not available yet.");
+      return;
+    }
+
+    setLoadingPlan(planId);
+
+    try {
+      const { reference, access_code } = await api.post("/payments/initialize", { planKey });
+
+      const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+      const amount = PRICE_MAP[planId][currencyCode];
+
+      const popup = window.PaystackPop.setup({
+        key: publicKey,
+        email: user.email,
+        amount: currencyCode === "NGN" ? amount * 100 : amount * 100,
+        currency: currencyCode,
+        ref: reference,
+        access_code,
+        metadata: { planId, planKey },
+        onSuccess: async (txn) => {
+          try {
+            setLoadingPlan(planId);
+            await api.get(`/payments/verify/${txn.reference}`);
+            toast.success(`You're now on the ${planId} plan. Welcome to the full Seevv experience!`);
+            navigate("/dashboard");
+          } catch (err) {
+            toast.error(`Payment received but upgrade failed: ${err.message}. Contact support.`);
+          } finally {
+            setLoadingPlan(null);
+          }
+        },
+        onCancel: () => {
+          setLoadingPlan(null);
+          toast.info("Payment cancelled.");
+        },
+      });
+
+      popup.openIframe();
+    } catch (err) {
+      toast.error(err.message || "Failed to start payment. Please try again.");
+      setLoadingPlan(null);
+    }
+  }, [user, paystackReady, currencyCode, navigate, toast]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -294,9 +376,8 @@ const Pricing = () => {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 lg:px-6 pt-10">
-        {/* Controls row: billing + currency */}
+        {/* Controls row */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
-          {/* Billing toggle */}
           <div className="inline-flex items-center bg-gray-100 rounded-full p-1 gap-1">
             <button
               onClick={() => setBilling("monthly")}
@@ -313,7 +394,6 @@ const Pricing = () => {
             </button>
           </div>
 
-          {/* Currency selector */}
           <div className="inline-flex items-center bg-gray-100 rounded-full p-1 gap-1">
             {currencies.map((c) => (
               <button
@@ -329,11 +409,11 @@ const Pricing = () => {
 
         {billing === "annual" && (
           <p className="text-center text-xs text-teal-700 font-medium -mt-6 mb-8">
-            Save up to 25% with annual billing
+            Save 25% with annual billing
           </p>
         )}
 
-        {/* Plan grid — 2 columns */}
+        {/* Plan grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
           {plans.map((plan) => (
             <PlanCard
@@ -341,23 +421,27 @@ const Pricing = () => {
               plan={plan}
               isCurrentPlan={currentPlan === plan.id}
               billing={billing}
-              currency={currency}
+              currencyCode={currencyCode}
               onSelect={handleSelect}
+              isLoading={loadingPlan === plan.id}
             />
           ))}
         </div>
 
-        {/* Coming soon notice */}
-        <div className="mt-8 bg-brand-50 border border-brand-100 rounded-xl px-5 py-4 text-center">
-          <p className="text-sm font-semibold text-brand-800">Billing launches soon</p>
-          <p className="text-xs text-brand-600 mt-1">
-            Click any plan to register your interest — you'll be the first to know when payments go live.
-            Nigeria users will be able to pay in Naira via Paystack.
+        {/* Paystack badge */}
+        <div className="mt-8 flex flex-col items-center gap-2">
+          <p className="text-xs text-gray-400">
+            Payments secured by{" "}
+            <span className="font-semibold text-gray-600">Paystack</span>
+            {" "}· Card, bank transfer, USSD supported
+          </p>
+          <p className="text-xs text-gray-300">
+            Nigerian users pay in ₦ with no FX fees · Visa, Mastercard, Verve accepted
           </p>
         </div>
 
         {/* Trust bar */}
-        <div className="mt-10 flex flex-wrap justify-center items-center gap-6 text-xs text-gray-400">
+        <div className="mt-8 flex flex-wrap justify-center items-center gap-6 text-xs text-gray-400">
           {[
             { icon: "M7 11V7a5 5 0 0 1 10 0v4M3 11h18v10H3z", label: "Cancel anytime" },
             { icon: "M20 6 9 17 4 12", label: "7-day money-back guarantee" },

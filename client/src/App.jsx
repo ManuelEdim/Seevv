@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/layout";
 import useAuth from "@/hooks/useAuth";
+import useSessionTimeout from "@/hooks/useSessionTimeout";
+import SessionTimeoutWarning from "@/components/SessionTimeoutWarning";
 import AuthCallback from "@/pages/AuthCallback";
 
 import Landing from "@/pages/Landing";
@@ -24,14 +26,46 @@ import InterviewPrep from "@/pages/InterviewPrep";
 import MockInterview from "@/pages/MockInterview";
 import ApplicationAnalytics from "@/pages/ApplicationAnalytics";
 import NotFound from "@/pages/NotFound";
+import Unauthorised from "@/pages/Unauthorised";
+import Admin from "@/pages/Admin";
+import ApplicationTracker from "@/pages/ApplicationTracker";
+import JobBoard from "@/pages/JobBoard";
+import CompanyIntel from "@/pages/CompanyIntel";
+import VoiceMirroring from "@/pages/VoiceMirroring";
+import ApiAccess from "@/pages/ApiAccess";
+import CustomBranding from "@/pages/CustomBranding";
+import Verification from "@/pages/Verification";
 
 const App = () => {
   const { isLoading } = useAuth();
+  const { showWarning, secondsLeft, extendSession, doSignOut } = useSessionTimeout();
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
+        <div className="relative">
+          <img
+            src="/favicon.png"
+            alt="Seevv"
+            className="w-14 h-14 object-contain animate-pulse"
+            style={{ animation: "seevv-breathe 1.6s ease-in-out infinite" }}
+          />
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{ animation: "seevv-ring 1.6s ease-in-out infinite", boxShadow: "0 0 0 0 rgba(3,56,118,0.4)" }}
+          />
+        </div>
+        <style>{`
+          @keyframes seevv-breathe {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.88); }
+          }
+          @keyframes seevv-ring {
+            0% { box-shadow: 0 0 0 0 rgba(3,56,118,0.35); }
+            70% { box-shadow: 0 0 0 18px rgba(3,56,118,0); }
+            100% { box-shadow: 0 0 0 0 rgba(3,56,118,0); }
+          }
+        `}</style>
       </div>
     );
   }
@@ -209,9 +243,101 @@ const App = () => {
           }
         />
 
+        {/* Admin dashboard — standalone, no AppLayout, admin-gated on the page */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <Admin />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/tracker"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <ApplicationTracker />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/jobs"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <JobBoard />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/company-intel"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <CompanyIntel />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/voice-mirror"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <VoiceMirroring />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/api-access"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <ApiAccess />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/branding"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <CustomBranding />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/verification"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Verification />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* 403 / 401 */}
+        <Route path="/unauthorized" element={<Unauthorised />} />
+
         {/* 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+
+      {showWarning && (
+        <SessionTimeoutWarning
+          secondsLeft={secondsLeft}
+          onExtend={extendSession}
+          onSignOut={doSignOut}
+        />
+      )}
     </BrowserRouter>
   );
 };

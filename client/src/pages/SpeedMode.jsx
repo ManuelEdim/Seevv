@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, Card, Spinner } from "@/components/ui";
 import useJobTargets from "@/hooks/useJobTargets";
 import api from "@/lib/api";
+import FeatureGate from "@/components/FeatureGate";
 
 // ─── Score ring ────────────────────────────────────────────
 const ScoreRing = ({ score }) => {
@@ -296,4 +297,7 @@ const SpeedMode = () => {
   );
 };
 
-export default SpeedMode;
+const SpeedModeGated = () => (
+  <FeatureGate feature="speed_mode"><SpeedMode /></FeatureGate>
+);
+export default SpeedModeGated;

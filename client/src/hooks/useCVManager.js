@@ -10,7 +10,10 @@ const useCVManager = () => {
   const [error, setError] = useState(null);
 
   const fetchCVData = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
 

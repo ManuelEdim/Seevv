@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, Card, Spinner } from "@/components/ui";
 import api from "@/lib/api";
+import FeatureGate from "@/components/FeatureGate";
 
 // ─── Score bar ─────────────────────────────────────────────
 const ScoreBar = ({ skill, score, color }) => (
@@ -284,4 +285,7 @@ const SkillsGraph = () => {
   );
 };
 
-export default SkillsGraph;
+const SkillsGraphGated = () => (
+  <FeatureGate feature="skills_graph"><SkillsGraph /></FeatureGate>
+);
+export default SkillsGraphGated;

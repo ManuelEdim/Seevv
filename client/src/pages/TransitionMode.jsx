@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, Card, Spinner } from "@/components/ui";
 import api from "@/lib/api";
 import useJobTargets from "@/hooks/useJobTargets";
+import FeatureGate from "@/components/FeatureGate";
 
 const COMMON_INDUSTRIES = [
   "Finance", "Technology", "Healthcare", "Marketing", "Education",
@@ -395,4 +396,7 @@ const TransitionMode = () => {
   );
 };
 
-export default TransitionMode;
+const TransitionModeGated = () => (
+  <FeatureGate feature="transition_mode"><TransitionMode /></FeatureGate>
+);
+export default TransitionModeGated;

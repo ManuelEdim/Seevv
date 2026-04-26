@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Spinner, Badge } from "@/components/ui";
 import api from "@/lib/api";
+import FeatureGate from "@/components/FeatureGate";
 
 // ─── Status config ─────────────────────────────────────────
 const statusConfig = {
@@ -74,7 +75,7 @@ const Funnel = ({ statusCounts, total }) => {
 };
 
 // ─── Version row ───────────────────────────────────────────
-const VersionRow = ({ v, navigate }) => {
+const VersionRow = ({ v }) => {
   const sc = statusConfig[v.status] || statusConfig.saved;
   return (
     <div className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
@@ -372,4 +373,7 @@ const ApplicationAnalytics = () => {
   );
 };
 
-export default ApplicationAnalytics;
+const ApplicationAnalyticsGated = () => (
+  <FeatureGate feature="analytics"><ApplicationAnalytics /></FeatureGate>
+);
+export default ApplicationAnalyticsGated;

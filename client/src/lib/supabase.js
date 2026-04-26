@@ -14,5 +14,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+    storageKey: "seevv-auth-v1",
+    // Bypass the Web Locks API. Supabase uses navigator.locks.request() to coordinate
+    // token refreshes across tabs. When a new page load starts it steals the lock,
+    // aborting the previous holder and throwing AbortError everywhere. Bypassing the
+    // lock means each tab refreshes independently — safe for a standard web app.
+    lock: (_name, _acquireTimeout, fn) => fn(),
   },
 });

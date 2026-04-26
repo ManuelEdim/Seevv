@@ -28,7 +28,6 @@ const CVManager = () => {
 
   const [showUploader, setShowUploader] = useState(false);
   const [isTailoring, setIsTailoring] = useState(false);
-  const [deletingVersionId, setDeletingVersionId] = useState(null);
   const [tailoringTriggered, setTailoringTriggered] = useState(false);
   const [hasVoiceSample, setHasVoiceSample] = useState(null); // null = loading
 
@@ -57,6 +56,7 @@ const CVManager = () => {
       setTailoringTriggered(true);
       handleTailorCV(tailorJobId);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tailorJobId, masterCV, isLoading]);
 
   const handleTailorCV = async (jobId) => {
@@ -112,14 +112,11 @@ const CVManager = () => {
     );
     if (!confirmed) return;
 
-    setDeletingVersionId(versionId);
     try {
       await deleteVersion(versionId);
       toast.success("CV version deleted.");
     } catch (error) {
       toast.error(error.message || "Failed to delete version.");
-    } finally {
-      setDeletingVersionId(null);
     }
   };
 

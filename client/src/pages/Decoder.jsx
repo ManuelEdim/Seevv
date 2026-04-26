@@ -4,12 +4,6 @@ import { Button, Badge, Spinner, Card } from "@/components/ui";
 import useDecoder from "@/hooks/useDecoder";
 import api from "@/lib/api";
 
-const confidenceColors = {
-  high: "success",
-  medium: "warning",
-  low: "danger",
-};
-
 const urgencyColors = {
   high: "danger",
   medium: "warning",

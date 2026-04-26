@@ -22,6 +22,12 @@ import interviewRouter from "./routes/interview.js";
 import analyticsRouter from "./routes/analytics.js";
 import skillsRouter from "./routes/skills.js";
 import recruiterRouter from "./routes/recruiter.js";
+import paymentsRouter from "./routes/payments.js";
+import adminRouter from "./routes/admin.js";
+import voiceMirrorRouter from "./routes/voiceMirror.js";
+import brandingRouter from "./routes/branding.js";
+import apiAccessRouter from "./routes/apiAccess.js";
+import verificationRouter from "./routes/verification.js";
 
 // Middleware
 import errorHandler from "./middleware/errorHandler.js";
@@ -79,6 +85,12 @@ app.use("/api/interview", interviewRouter);
 app.use("/api/analytics", analyticsRouter);
 app.use("/api/skills", skillsRouter);
 app.use("/api/recruiter", recruiterRouter);
+app.use("/api/payments", paymentsRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/voice-mirror", voiceMirrorRouter);
+app.use("/api/branding", brandingRouter);
+app.use("/api/api-access", apiAccessRouter);
+app.use("/api/verification", verificationRouter);
 
 // ─── 404 handler ───────────────────────────
 app.use((req, res) => {

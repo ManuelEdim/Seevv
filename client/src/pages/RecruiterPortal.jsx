@@ -203,7 +203,7 @@ const CandidatesView = ({ onViewCandidate, onSelectForRank, selectedForRank }) =
             <div className="col-span-2 text-right">Actions</div>
           </div>
 
-          {sorted.map((c, i) => {
+          {sorted.map((c) => {
             const isSelected = selectedForRank.has(c.id);
             const canSelect = isSelected || selectedForRank.size < 5;
 
@@ -317,7 +317,7 @@ const CandidateDetailView = ({ userId, onBack, onAddToRank }) => {
     </div>
   );
 
-  const { profile, cv, stats, versions, recentJobs } = data;
+  const { profile, cv, stats, recentJobs } = data;
   const statusColors = {
     saved: "bg-gray-100 text-gray-600",
     applied: "bg-brand-50 text-brand-700",

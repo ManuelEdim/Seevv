@@ -1,20 +1,85 @@
 import { Router } from "express";
 import authMiddleware from "../middleware/auth.js";
 import { parseJobDescription } from "../lib/ai.js";
+import { supabase } from "../lib/supabase.js";
 
 const router = Router();
 
 router.use(authMiddleware);
 
-router.get("/", (req, res) => {
-  res.json({
-    message: "Get all jobs — coming in Phase 4",
-    userId: req.user.id,
-  });
+// GET /api/jobs — fetch all job targets for the user
+router.get("/", async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const { data, error } = await supabase
+      .from("job_targets")
+      .select("id, job_title, company_name, job_description, status, notes, applied_at, created_at, updated_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    res.json({ jobs: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-router.post("/", (req, res) => {
-  res.json({ message: "Create job target — coming in Phase 4" });
+// POST /api/jobs — create a new job target
+router.post("/", async (req, res) => {
+  const userId = req.user.id;
+  const { job_title, company_name, job_description, location, salary_range, job_url, status = "saved" } = req.body;
+
+  if (!job_title || !company_name) {
+    return res.status(400).json({ error: "job_title and company_name are required" });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("job_targets")
+      .insert({ user_id: userId, job_title, company_name, job_description, location, salary_range, job_url, status })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/jobs/:id/status — update application status
+router.patch("/:id/status", async (req, res) => {
+  const userId = req.user.id;
+  const { id } = req.params;
+  const { status, notes } = req.body;
+
+  const VALID_STATUSES = ["saved", "applied", "interview", "offer", "rejected"];
+  if (status && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ error: "Invalid status" });
+  }
+
+  const updates = {};
+  if (status) {
+    updates.status = status;
+    if (status === "applied") updates.applied_at = new Date().toISOString();
+  }
+  if (notes !== undefined) updates.notes = notes;
+  updates.updated_at = new Date().toISOString();
+
+  try {
+    const { data, error } = await supabase
+      .from("job_targets")
+      .update(updates)
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Strip HTML tags and extract readable text from a page
@@ -145,8 +210,22 @@ router.post("/parse-jd", async (req, res) => {
   }
 });
 
-router.post("/:jobId/decode", (req, res) => {
-  res.json({ message: "Decode job — coming in Phase 4" });
+// POST /api/jobs/:jobId/decode — alias to the decoder route
+router.post("/:jobId/decode", async (req, res) => {
+  const { jobId } = req.params;
+  const userId = req.user.id;
+  try {
+    const { data: job, error } = await supabase
+      .from("job_targets")
+      .select("job_title, company_name, job_description")
+      .eq("id", jobId)
+      .eq("user_id", userId)
+      .single();
+    if (error || !job) return res.status(404).json({ error: "Job not found" });
+    res.json({ jobId, jobTitle: job.job_title, company: job.company_name, redirectTo: `/decoder?jobId=${jobId}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;

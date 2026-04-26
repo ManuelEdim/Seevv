@@ -3,7 +3,7 @@ import { devtools } from "zustand/middleware";
 
 const useCVStore = create(
   devtools(
-    (set, get) => ({
+    (set) => ({
       // State
       masterCV: null, // the original uploaded CV
       parsedChunks: [], // structured sections from the parser

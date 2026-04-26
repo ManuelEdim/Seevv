@@ -3,7 +3,7 @@ import { devtools } from "zustand/middleware";
 
 const useJobStore = create(
   devtools(
-    (set, get) => ({
+    (set) => ({
       // State
       jobs: [], // all targeted job roles
       activeJob: null, // job currently being worked on

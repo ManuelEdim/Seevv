@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store";
-import { detectIsNigerian, getDetectedCountry } from "@/lib/location";
+import { getDetectedCountry } from "@/lib/location";
 
 const useProfile = () => {
   const user = useAuthStore((state) => state.user);
@@ -11,7 +11,10 @@ const useProfile = () => {
   const [error, setError] = useState(null);
 
   const fetchProfile = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
 
@@ -69,8 +72,6 @@ const useProfile = () => {
         if (error) throw error;
         setProfile(data);
         return data;
-      } catch (err) {
-        throw err;
       } finally {
         setIsSaving(false);
       }

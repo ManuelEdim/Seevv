@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button, Card, Spinner } from "@/components/ui";
 import api from "@/lib/api";
+import FeatureGate from "@/components/FeatureGate";
+import { supabase } from "@/lib/supabase";
 
 const PROOF_TYPES = [
   "GitHub / Code",
@@ -224,6 +226,7 @@ const ProofOfWork = () => {
   const [evidence, setEvidence] = useState([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isLoadingEvidence, setIsLoadingEvidence] = useState(true);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [error, setError] = useState(null);
 
   const loadEvidence = useCallback(async () => {
@@ -276,6 +279,34 @@ const ProofOfWork = () => {
       setEvidence((prev) => prev.map((e) => (e.id === id ? updated : e)));
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (evidence.length === 0) return;
+    setIsExportingPdf(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/export/proof-of-work/pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) { const e = await response.json(); throw new Error(e.error || "Export failed"); }
+      const disposition = response.headers.get("Content-Disposition");
+      const match = disposition?.match(/filename="([^"]+)"/);
+      const fileName = match ? match[1] : "Proof of Work.pdf";
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || "Failed to export PDF.");
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -344,9 +375,14 @@ const ProofOfWork = () => {
             </p>
           </div>
           {evidence.length > 0 && (
-            <span className="text-xs px-2.5 py-1 bg-teal-50 text-teal-700 rounded-full border border-teal-100 font-semibold">
-              {evidence.length} backed
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2.5 py-1 bg-teal-50 text-teal-700 rounded-full border border-teal-100 font-semibold">
+                {evidence.length} backed
+              </span>
+              <Button variant="outline" size="sm" isLoading={isExportingPdf} onClick={handleExportPdf}>
+                Export PDF
+              </Button>
+            </div>
           )}
         </div>
 
@@ -385,4 +421,7 @@ const ProofOfWork = () => {
   );
 };
 
-export default ProofOfWork;
+const ProofOfWorkGated = () => (
+  <FeatureGate feature="proof_of_work"><ProofOfWork /></FeatureGate>
+);
+export default ProofOfWorkGated;

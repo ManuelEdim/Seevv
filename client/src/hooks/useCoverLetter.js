@@ -42,7 +42,10 @@ const useCoverLetter = () => {
 
   // Fetch ALL cover letters for this user (for the list view)
   const fetchAllCoverLetters = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setIsLoadingAll(false);
+      return;
+    }
     setIsLoadingAll(true);
     try {
       const { data, error } = await supabase
@@ -248,8 +251,6 @@ const useCoverLetter = () => {
         }
 
         setHasUnsavedChanges(false);
-      } catch (err) {
-        throw err;
       } finally {
         setIsSaving(false);
       }

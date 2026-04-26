@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Button, Card, Spinner, Badge } from "@/components/ui";
 import useJobTargets from "@/hooks/useJobTargets";
 import api from "@/lib/api";
+import FeatureGate from "@/components/FeatureGate";
 
 // ─── Step 1: Analysis result ──────────────────────────────
 const GapAnalysis = ({ analysis, jobTitle, company, onGenerateProjects }) => {
@@ -330,4 +331,7 @@ const GapRoadmap = () => {
   );
 };
 
-export default GapRoadmap;
+const GapRoadmapGated = () => (
+  <FeatureGate feature="gap_roadmap"><GapRoadmap /></FeatureGate>
+);
+export default GapRoadmapGated;

@@ -9,19 +9,27 @@ const useJobTargets = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
 
     const fetch = async () => {
       setIsLoading(true);
-      const { data, error: err } = await supabase
-        .from("job_targets")
-        .select("id, job_title, company_name, job_description, status")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      try {
+        const { data, error: err } = await supabase
+          .from("job_targets")
+          .select("id, job_title, company_name, job_description, status")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
 
-      if (err) setError(err.message);
-      else setJobs(data || []);
-      setIsLoading(false);
+        if (err) setError(err.message);
+        else setJobs(data || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetch();

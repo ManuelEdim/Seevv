@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button, Card, Spinner } from "@/components/ui";
 import useJobTargets from "@/hooks/useJobTargets";
 import api from "@/lib/api";
+import FeatureGate from "@/components/FeatureGate";
 
 // ─── Score ring ────────────────────────────────────────────
 const ScoreRing = ({ score, size = 80 }) => {
@@ -203,7 +204,7 @@ const QuestionScreen = ({ question, index, total, onSubmit, isScoring }) => {
 };
 
 // ─── Score result screen ───────────────────────────────────
-const ScoreScreen = ({ scoring, question, onNext, isLast }) => (
+const ScoreScreen = ({ scoring, onNext, isLast }) => (
   <Card padding="md">
     <div className="space-y-5">
       <div className="flex items-center gap-5">
@@ -359,7 +360,6 @@ const FinalResults = ({ scorings, questions, onRetry }) => {
 // ─── Main page ─────────────────────────────────────────────
 const MockInterview = () => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const preselected = searchParams.get("jobId");
 
   const { jobs, isLoading: isLoadingJobs } = useJobTargets();
@@ -546,4 +546,7 @@ const MockInterview = () => {
   );
 };
 
-export default MockInterview;
+const MockInterviewGated = () => (
+  <FeatureGate feature="mock_interview"><MockInterview /></FeatureGate>
+);
+export default MockInterviewGated;

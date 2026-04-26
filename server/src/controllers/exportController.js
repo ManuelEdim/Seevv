@@ -25,7 +25,7 @@ export const exportCVAsPdf = async (req, res) => {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("full_name")
+      .select("full_name, branding")
       .eq("id", userId)
       .single();
 
@@ -208,6 +208,7 @@ export const exportCVAsPdf = async (req, res) => {
       achievements,
       projects,
       tone: version.tone || "balanced",
+      branding: profile?.branding || {},
     });
 
     // ── Filename: "Software Engineer (Stripe) - Emmanuel Okang Edim.pdf" ──

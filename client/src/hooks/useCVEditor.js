@@ -17,7 +17,10 @@ const useCVEditor = () => {
   const userId = user?.id;
 
   const fetchVersion = useCallback(async () => {
-    if (!versionId || !userId) return;
+    if (!versionId || !userId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
 
@@ -34,7 +37,7 @@ const useCVEditor = () => {
         `,
         )
         .eq("id", versionId)
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .single();
 
       if (error) throw error;
@@ -75,12 +78,10 @@ const useCVEditor = () => {
           updated_at: new Date().toISOString(),
         })
         .eq("id", version.id)
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (error) throw error;
       setHasUnsavedChanges(false);
-    } catch (err) {
-      throw err;
     } finally {
       setIsSaving(false);
     }

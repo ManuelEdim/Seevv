@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button, Card, Spinner } from "@/components/ui";
 import useJobTargets from "@/hooks/useJobTargets";
 import api from "@/lib/api";
+import FeatureGate from "@/components/FeatureGate";
 
 // ─── STAR block ────────────────────────────────────────────
 const StarBlock = ({ star }) => (
@@ -377,4 +378,7 @@ const InterviewPrep = () => {
   );
 };
 
-export default InterviewPrep;
+const InterviewPrepGated = () => (
+  <FeatureGate feature="interview_prep"><InterviewPrep /></FeatureGate>
+);
+export default InterviewPrepGated;

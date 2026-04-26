@@ -52,7 +52,7 @@ api.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${session.access_token}`;
           return api(originalRequest);
         }
-      } catch (refreshError) {
+      } catch {
         // Refresh failed — sign out the user
         await supabase.auth.signOut();
         window.location.href = "/login";

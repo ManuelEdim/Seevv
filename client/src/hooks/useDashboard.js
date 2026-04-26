@@ -15,26 +15,35 @@ const useDashboard = () => {
   const [jobTargets, setJobTargets] = useState([]);
 
   const fetchDashboardData = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
 
-    try {
+    const doFetch = async (attempt = 0) => {
       const { data: jobs, error: jobsError } = await supabase
         .from("job_targets")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (jobsError) throw jobsError;
+      if (jobsError) {
+        if (jobsError.name === "AbortError" && attempt < 1) {
+          await new Promise((r) => setTimeout(r, 800));
+          return doFetch(attempt + 1);
+        }
+        throw jobsError;
+      }
 
       const { count: cvCount, error: cvError } = await supabase
         .from("cv_versions")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
 
-      if (cvError) throw cvError;
+      if (cvError && cvError.name !== "AbortError") throw cvError;
 
       const applied =
         jobs?.filter((j) =>
@@ -61,9 +70,18 @@ const useDashboard = () => {
         interviews,
         cvVersions: cvCount || 0,
       });
+    };
+
+    try {
+      await doFetch();
     } catch (err) {
-      console.error("Dashboard fetch error:", err);
-      setError(err.message);
+      // Swallow transient lock errors silently — they self-resolve on next navigation
+      if (err.name === "AbortError") {
+        console.warn("Dashboard fetch aborted (lock contention), retrying later");
+      } else {
+        console.error("Dashboard fetch error:", err);
+        setError(err.message);
+      }
     } finally {
       setIsLoading(false);
     }

@@ -4,6 +4,7 @@ import { Button, Badge, Spinner, Card } from "@/components/ui";
 import useCVEditor from "@/hooks/useCVEditor";
 import { useToast } from "@/context/ToastContext";
 import { supabase } from "@/lib/supabase";
+import api from "@/lib/api";
 
 // ─── Rewrite level config ─────────────────────────────────
 
@@ -527,7 +528,11 @@ const CVEditor = () => {
   const { toast } = useToast();
   const [activePanel, setActivePanel] = useState("editor");
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [isSavingDecisions, setIsSavingDecisions] = useState(false);
+  const [blindSpots, setBlindSpots] = useState(null);
+  const [isLoadingBlindSpots, setIsLoadingBlindSpots] = useState(false);
+  const [blindSpotsError, setBlindSpotsError] = useState(null);
   const [localDecisions, setLocalDecisions] = useState({});
   const patchTimeoutRef = useRef(null);
 
@@ -699,6 +704,69 @@ const CVEditor = () => {
     }
   };
 
+  const handleExportDocx = async () => {
+    if (!version?.id) return;
+    setIsExportingDocx(true);
+    toast.info("Generating your DOCX file…");
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/export/cv/docx`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ versionId: version.id }),
+        },
+      );
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Export failed");
+      }
+
+      const disposition = response.headers.get("Content-Disposition");
+      const match = disposition && disposition.match(/filename="([^"]+)"/);
+      const fileName = match ? match[1] : `${version.version_name || "CV"}.docx`;
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("DOCX downloaded successfully!");
+    } catch (err) {
+      toast.error(err.message || "Failed to export DOCX.");
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
+
+  const handleLoadBlindSpots = async () => {
+    if (!version?.id) return;
+    setIsLoadingBlindSpots(true);
+    setBlindSpotsError(null);
+    try {
+      const data = await api.post("/cv/blind-spots", { versionId: version.id });
+      setBlindSpots(Array.isArray(data) ? data : data.blind_spots || []);
+    } catch (err) {
+      setBlindSpotsError(err.message || "Failed to load blind spots.");
+    } finally {
+      setIsLoadingBlindSpots(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -823,6 +891,18 @@ const CVEditor = () => {
           >
             {exportReady ? "Export PDF" : `${pendingDecisions} pending`}
           </Button>
+
+          {exportReady && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportDocx}
+              isLoading={isExportingDocx}
+              title="Export as Word document (.docx)"
+            >
+              Export DOCX
+            </Button>
+          )}
         </div>
       </div>
 
@@ -831,6 +911,7 @@ const CVEditor = () => {
         {[
           { id: "editor", label: "CV Editor" },
           { id: "ats", label: "ATS Preview" },
+          { id: "blind_spots", label: "Blind Spots" },
         ].map((panel) => (
           <button
             key={panel.id}
@@ -1011,6 +1092,84 @@ const CVEditor = () => {
       {/* ── ATS Preview ──────────────────────────────── */}
       {activePanel === "ats" && (
         <ATSPreview version={version} tailoredContent={tc} />
+      )}
+
+      {/* ── Blind Spots ──────────────────────────────── */}
+      {activePanel === "blind_spots" && (
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">Blind Spot Detector</span> — finds skills and achievements on your CV that are undersold or not named clearly. Fix them before a recruiter misses them.
+            </p>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              variant="primary"
+              size="sm"
+              isLoading={isLoadingBlindSpots}
+              onClick={handleLoadBlindSpots}
+            >
+              {blindSpots ? "Re-analyse" : "Analyse CV"}
+            </Button>
+          </div>
+
+          {isLoadingBlindSpots && (
+            <Card padding="md">
+              <div className="flex items-center gap-3 py-4">
+                <Spinner size="sm" />
+                <p className="text-xs text-gray-500">Reading your CV for hidden strengths…</p>
+              </div>
+            </Card>
+          )}
+
+          {blindSpotsError && (
+            <div className="bg-coral-50 border border-coral-200 rounded-xl p-3">
+              <p className="text-sm text-coral-700">{blindSpotsError}</p>
+            </div>
+          )}
+
+          {blindSpots && !isLoadingBlindSpots && (
+            blindSpots.length === 0 ? (
+              <Card padding="md">
+                <div className="text-center py-6">
+                  <p className="text-sm text-teal-700 font-semibold">No blind spots found</p>
+                  <p className="text-xs text-gray-400 mt-1">Your CV is communicating your skills clearly.</p>
+                </div>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  {blindSpots.length} blind spot{blindSpots.length !== 1 ? "s" : ""} found
+                </p>
+                {blindSpots.map((spot, i) => (
+                  <div key={i} className="bg-white rounded-xl border border-amber-100 p-4 space-y-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1">Original text</p>
+                      <p className="text-xs text-gray-500 italic leading-relaxed">"{spot.original_text}"</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-700 mb-1">Blind spot</p>
+                      <p className="text-sm text-gray-900 font-medium leading-relaxed">{spot.blind_spot}</p>
+                    </div>
+                    <div className="bg-brand-50 rounded-lg p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-700 mb-1">Suggested reframe</p>
+                      <p className="text-xs text-brand-800 leading-relaxed">{spot.suggestion}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+
+          {!blindSpots && !isLoadingBlindSpots && (
+            <Card padding="md">
+              <div className="text-center py-8">
+                <p className="text-sm text-gray-400">Click "Analyse CV" to detect hidden strengths in your CV.</p>
+              </div>
+            </Card>
+          )}
+        </div>
       )}
     </div>
   );
