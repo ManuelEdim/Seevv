@@ -1536,9 +1536,19 @@ const FooterCol = ({ title, links }) => (
   <div>
     <p className="font-bold text-white/60 mb-4 uppercase tracking-widest text-[10px]">{title}</p>
     <ul className="space-y-2.5">
-      {links.map((l) => (
-        <li key={l} className="text-xs text-white/40 hover:text-white/80 cursor-pointer transition-colors">
-          {l}
+      {links.map(({ label, to, href }) => (
+        <li key={label}>
+          {to ? (
+            <Link to={to} className="text-xs text-white/40 hover:text-white/80 transition-colors">
+              {label}
+            </Link>
+          ) : href ? (
+            <a href={href} className="text-xs text-white/40 hover:text-white/80 transition-colors">
+              {label}
+            </a>
+          ) : (
+            <span className="text-xs text-white/40">{label}</span>
+          )}
         </li>
       ))}
     </ul>
@@ -1594,15 +1604,29 @@ const Footer = () => {
         <div className="lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 gap-8">
           <FooterCol
             title="Product"
-            links={["Deep Decoder", "CV Tailoring", "Cover Letters", "Interview Prep", "Skills Graph", "Speed Mode"]}
+            links={[
+              { label: "Deep Decoder", to: "/decoder" },
+              { label: "CV Tailoring", to: "/cv-manager" },
+              { label: "Cover Letters", to: "/cover-letter" },
+              { label: "Interview Prep", to: "/interview-prep" },
+              { label: "Skills Graph", to: "/skills-graph" },
+              { label: "Speed Mode", to: "/speed-mode" },
+            ]}
           />
           <FooterCol
             title="Company"
-            links={["About", "Pricing", "Partners", "Contact"]}
+            links={[
+              { label: "Pricing", to: "/pricing" },
+              { label: "Contact", href: "mailto:hello@seevv.com" },
+              { label: "About", to: "/" },
+            ]}
           />
           <FooterCol
             title="Legal"
-            links={["Privacy Policy", "Terms of Use", "Cookie Policy"]}
+            links={[
+              { label: "Privacy Policy", to: "/privacy" },
+              { label: "Terms of Use", to: "/terms" },
+            ]}
           />
         </div>
       </div>

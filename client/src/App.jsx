@@ -27,6 +27,8 @@ import MockInterview from "@/pages/MockInterview";
 import ApplicationAnalytics from "@/pages/ApplicationAnalytics";
 import NotFound from "@/pages/NotFound";
 import Unauthorised from "@/pages/Unauthorised";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import TermsOfUse from "@/pages/TermsOfUse";
 import Admin from "@/pages/Admin";
 import ApplicationTracker from "@/pages/ApplicationTracker";
 import JobBoard from "@/pages/JobBoard";
@@ -326,6 +328,8 @@ const App = () => {
 
         {/* 403 / 401 */}
         <Route path="/unauthorized" element={<Unauthorised />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfUse />} />
 
         {/* 404 */}
         <Route path="*" element={<NotFound />} />
