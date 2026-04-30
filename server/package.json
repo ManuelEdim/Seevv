@@ -26,5 +26,8 @@
   },
   "devDependencies": {
     "nodemon": "latest"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   }
 }
