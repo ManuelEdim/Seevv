@@ -281,7 +281,7 @@ const VerificationPage = () => {
         </div>
         <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
           <div
-            className="h-2 rounded-full bg-gradient-to-r from-brand-600 to-teal-500 transition-all duration-700"
+            className="h-2 rounded-full bg-linear-to-r from-brand-600 to-teal-500 transition-all duration-700"
             style={{ width: `${(verifiedCount / BADGE_TYPES.length) * 100}%` }}
           />
         </div>
