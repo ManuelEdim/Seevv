@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAuthStore } from "@/store";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/context/ToastContext";
@@ -227,6 +227,11 @@ const JobBoard = () => {
     if (e.key === "Enter") search();
   };
 
+  // Auto-load on first mount with default (no) filters
+  useEffect(() => {
+    search();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const saveToTracker = async (job) => {
     if (!user) return toast.error("Sign in to save jobs.");
     setSavingId(job.id);
@@ -289,7 +294,7 @@ const JobBoard = () => {
             className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white text-gray-700"
           >
             {JOB_TYPES.map((t) => (
-              <option key={t}>{t}</option>
+              <option key={t} value={t}>{JOB_TYPE_LABELS[t] || t}</option>
             ))}
           </select>
           <button
