@@ -5,10 +5,12 @@ services:
     region: oregon
     plan: free
     rootDir: server
-    buildCommand: npm install && npx puppeteer browsers install chrome
+    buildCommand: npm install && (npx puppeteer browsers install chrome || true)
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
         value: "22"
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/project/src/.cache/puppeteer
