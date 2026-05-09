@@ -264,4 +264,66 @@ router.get("/stats/extended", async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/verification-requests ─────────────────
+router.get("/verification-requests", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("verification_requests")
+      .select("user_id, badge_type, status, requested_at, profile:profiles(full_name, email)")
+      .eq("status", "pending")
+      .order("requested_at", { ascending: false });
+    if (error) throw error;
+    // Attach a synthetic id for client keying
+    const requests = (data || []).map((r) => ({
+      ...r,
+      id: `${r.user_id}::${r.badge_type}`,
+    }));
+    res.json({ requests });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── PATCH /api/admin/verification-requests/approve ───────
+router.patch("/verification-requests/approve", async (req, res) => {
+  const { userId, badgeType } = req.body;
+  if (!userId || !badgeType) return res.status(400).json({ error: "userId and badgeType required" });
+  try {
+    await supabase
+      .from("verification_requests")
+      .update({ status: "approved" })
+      .eq("user_id", userId)
+      .eq("badge_type", badgeType);
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("verification_badges")
+      .eq("id", userId)
+      .single();
+
+    const badges = { ...(profile?.verification_badges || {}), [badgeType]: new Date().toISOString() };
+    await supabase.from("profiles").update({ verification_badges: badges }).eq("id", userId);
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── PATCH /api/admin/verification-requests/reject ────────
+router.patch("/verification-requests/reject", async (req, res) => {
+  const { userId, badgeType } = req.body;
+  if (!userId || !badgeType) return res.status(400).json({ error: "userId and badgeType required" });
+  try {
+    await supabase
+      .from("verification_requests")
+      .update({ status: "rejected" })
+      .eq("user_id", userId)
+      .eq("badge_type", badgeType);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

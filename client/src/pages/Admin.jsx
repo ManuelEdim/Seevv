@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import useAuthStore from "@/store/authStore";
@@ -447,6 +447,100 @@ const PlatformStats = () => {
   );
 };
 
+// ─── Verification requests ────────────────────────────────
+const BADGE_LABELS = {
+  identity:   "Identity Verified",
+  employment: "Employment Verified",
+  education:  "Education Verified",
+  skills:     "Skills Assessed",
+};
+
+const VerificationRequests = ({ requests, onApprove, onReject, loading }) => {
+  const [actioning, setActioning] = useState(null);
+
+  const act = async (fn, id) => {
+    setActioning(id);
+    await fn(id);
+    setActioning(null);
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" /></div>;
+  if (requests.length === 0) return (
+    <div className="text-center py-16">
+      <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>
+        </svg>
+      </div>
+      <p className="text-sm text-gray-400">No pending verification requests.</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {requests.map((req) => (
+        <div key={req.id} className="flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-gray-900">{req.profile?.full_name || "Unknown user"}</p>
+            <p className="text-xs text-gray-400 truncate">{req.profile?.email}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full border border-amber-100">{BADGE_LABELS[req.badge_type] || req.badge_type}</span>
+              <span className="text-[10px] text-gray-400">{new Date(req.requested_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={() => act(onApprove, req.id)} disabled={actioning === req.id}
+              className="text-xs font-semibold px-3 py-1.5 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors cursor-pointer disabled:opacity-50">
+              {actioning === req.id ? "…" : "Approve"}
+            </button>
+            <button onClick={() => act(onReject, req.id)} disabled={actioning === req.id}
+              className="text-xs font-semibold px-3 py-1.5 border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50">
+              Reject
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ─── Notification toast ────────────────────────────────────
+const NotifToast = ({ notif, onDismiss, onView }) => {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 8000);
+    return () => clearTimeout(t);
+  }, [onDismiss]);
+
+  return (
+    <div className="bg-white rounded-xl shadow-2xl border border-gray-100 p-4 flex items-start gap-3 w-80 animate-in slide-in-from-bottom-4 duration-300">
+      <div className="w-9 h-9 bg-red-50 rounded-full flex items-center justify-center shrink-0">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-gray-900">
+          {notif.newCount === 1 ? "New verification request" : `${notif.newCount} new verification requests`}
+        </p>
+        <p className="text-xs text-gray-500 mt-0.5 truncate">
+          {notif.newCount === 1
+            ? `${notif.requests[0]?.profile?.full_name || "A user"} — ${BADGE_LABELS[notif.requests[0]?.badge_type] || ""}`
+            : `${notif.requests.map((r) => r.profile?.full_name || "a user").slice(0, 2).join(", ")}${notif.newCount > 2 ? ` +${notif.newCount - 2} more` : ""}`}
+        </p>
+        <div className="flex gap-3 mt-2">
+          <button onClick={onView} className="text-xs font-semibold text-brand-700 hover:text-brand-900 cursor-pointer">Review →</button>
+          <button onClick={onDismiss} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Dismiss</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main admin page ───────────────────────────────────────
 const Admin = () => {
   const navigate    = useNavigate();
@@ -464,6 +558,11 @@ const Admin = () => {
   const [deleteUser, setDeleteUser] = useState(null);
   const [error,      setError]      = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [pendingVerifications, setPendingVerifications] = useState([]);
+  const [verifLoading, setVerifLoading]                 = useState(false);
+  const [notifs, setNotifs]                             = useState([]);
+  const prevVerifCountRef = useRef(null);
 
   useEffect(() => {
     if (!isLoading && profile && profile.role !== "admin") navigate("/dashboard", { replace: true });
@@ -491,6 +590,51 @@ const Admin = () => {
   }, [search, roleFilter, planFilter]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
+
+  const fetchVerifications = useCallback(async () => {
+    setVerifLoading(true);
+    try {
+      const data = await api.get("/admin/verification-requests");
+      const requests = data.requests || [];
+      if (prevVerifCountRef.current !== null && requests.length > prevVerifCountRef.current) {
+        const diff = requests.length - prevVerifCountRef.current;
+        setNotifs((prev) => [...prev, { id: Date.now(), newCount: diff, requests: requests.slice(0, diff) }]);
+      }
+      prevVerifCountRef.current = requests.length;
+      setPendingVerifications(requests);
+    } catch { } finally {
+      setVerifLoading(false);
+    }
+  }, []);
+
+  const handleApproveVerif = useCallback(async (requestId) => {
+    const req = pendingVerifications.find((r) => r.id === requestId);
+    if (!req) return;
+    try {
+      await api.patch("/admin/verification-requests/approve", { userId: req.user_id, badgeType: req.badge_type });
+      setPendingVerifications((prev) => prev.filter((r) => r.id !== requestId));
+      if (prevVerifCountRef.current !== null) prevVerifCountRef.current -= 1;
+    } catch (err) { setError(err.message); }
+  }, [pendingVerifications]);
+
+  const handleRejectVerif = useCallback(async (requestId) => {
+    const req = pendingVerifications.find((r) => r.id === requestId);
+    if (!req) return;
+    try {
+      await api.patch("/admin/verification-requests/reject", { userId: req.user_id, badgeType: req.badge_type });
+      setPendingVerifications((prev) => prev.filter((r) => r.id !== requestId));
+      if (prevVerifCountRef.current !== null) prevVerifCountRef.current -= 1;
+    } catch (err) { setError(err.message); }
+  }, [pendingVerifications]);
+
+  const dismissNotif = useCallback((id) => setNotifs((prev) => prev.filter((n) => n.id !== id)), []);
+
+  useEffect(() => {
+    if (!profile || profile.role !== "admin") return;
+    fetchVerifications();
+    const interval = setInterval(fetchVerifications, 30000);
+    return () => clearInterval(interval);
+  }, [fetchVerifications, profile]);
 
   const handleSaveUser = async (id, updates) => {
     try {
@@ -521,9 +665,10 @@ const Admin = () => {
     {
       group: "Admin Panel",
       items: [
-        { id: "overview",    label: "Overview",        icon: <Icon d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />, badge: stats?.total },
-        { id: "users",       label: "All Users",       icon: <Icon d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />, badge: users.filter(u => (u.role || "user") === "user").length },
-        { id: "recruiters",  label: "Recruiters",      icon: <Icon d={["M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2", "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"]} />, badge: users.filter(u => u.role === "recruiter").length },
+        { id: "overview",       label: "Overview",        icon: <Icon d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />, badge: stats?.total },
+        { id: "users",          label: "All Users",       icon: <Icon d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />, badge: users.filter(u => (u.role || "user") === "user").length },
+        { id: "recruiters",     label: "Recruiters",      icon: <Icon d={["M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2", "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"]} />, badge: users.filter(u => u.role === "recruiter").length },
+        { id: "verifications",  label: "Verifications",   icon: <Icon d={["M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z", "M9 12l2 2 4-4"]} />, badge: pendingVerifications.length || undefined },
       ],
     },
     {
@@ -545,6 +690,7 @@ const Admin = () => {
     overview:       "Overview",
     users:          "All Users",
     recruiters:     "Recruiters",
+    verifications:  "Verification Requests",
     cvs:            "Candidate CVs",
     cover_letters:  "Cover Letters",
     platform_stats: "Platform Stats",
@@ -626,6 +772,7 @@ const Admin = () => {
                 {section === "overview" && "Platform summary and user management"}
                 {section === "users" && "All registered job seekers"}
                 {section === "recruiters" && "Registered recruiter accounts"}
+                {section === "verifications" && `${pendingVerifications.length} pending request${pendingVerifications.length !== 1 ? "s" : ""}`}
                 {section === "cvs" && "All CV versions across the platform"}
                 {section === "cover_letters" && "All cover letters across the platform"}
                 {section === "platform_stats" && "In-depth platform metrics and analytics"}
@@ -634,6 +781,16 @@ const Admin = () => {
           </div>
           <div className="flex items-center gap-3">
             <p className="text-xs text-gray-400 hidden sm:block">{profile?.full_name || profile?.email}</p>
+            {pendingVerifications.length > 0 && (
+              <button onClick={() => setSection("verifications")} className="relative p-1.5 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {pendingVerifications.length}
+                </span>
+              </button>
+            )}
             <span className="text-[10px] font-bold px-2 py-1 bg-red-50 text-red-600 rounded-full border border-red-100 uppercase tracking-widest">Admin</span>
           </div>
         </header>
@@ -708,8 +865,37 @@ const Admin = () => {
             </div>
           )}
 
+          {/* ── Verifications ───────────────────────── */}
+          {section === "verifications" && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <p className="text-xs text-gray-400">Approve or reject badge verification requests from users.</p>
+              </div>
+              <div className="p-5">
+                <VerificationRequests
+                  requests={pendingVerifications}
+                  onApprove={handleApproveVerif}
+                  onReject={handleRejectVerif}
+                  loading={verifLoading}
+                />
+              </div>
+            </div>
+          )}
+
           {/* ── Users / Recruiters ──────────────────── */}
           {(section === "users" || section === "recruiters") && (
+            <>
+            {section === "recruiters" && (() => {
+              const recs = users.filter((u) => u.role === "recruiter");
+              const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+              return (
+                <div className="grid grid-cols-3 gap-4">
+                  <StatCard label="Total recruiters" value={recs.length} />
+                  <StatCard label="Joined this week" value={recs.filter((r) => new Date(r.created_at) > weekAgo).length} sub="New this week" />
+                  <StatCard label="Paid recruiters" value={recs.filter((r) => r.plan && r.plan !== "free").length} sub="Starter + Pro + Pro+" />
+                </div>
+              );
+            })()}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center gap-3">
                 <div className="relative flex-1 max-w-xs">
@@ -745,6 +931,7 @@ const Admin = () => {
                 filterRole={section === "recruiters" ? "recruiter" : ""}
               />
             </div>
+            </>
           )}
 
           {/* ── CV Library ──────────────────────────── */}
@@ -776,6 +963,20 @@ const Admin = () => {
       {/* Modals */}
       {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSave={handleSaveUser} />}
       {deleteUser && <DeleteConfirm user={deleteUser} onClose={() => setDeleteUser(null)} onConfirm={() => handleDeleteUser(deleteUser.id)} />}
+
+      {/* Notification toasts */}
+      {notifs.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none">
+          {notifs.slice(-3).map((n) => (
+            <NotifToast
+              key={n.id}
+              notif={n}
+              onDismiss={() => dismissNotif(n.id)}
+              onView={() => { setSection("verifications"); dismissNotif(n.id); }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

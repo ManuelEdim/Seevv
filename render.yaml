@@ -12,5 +12,7 @@ services:
         value: production
       - key: NODE_VERSION
         value: "22"
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "true"
       - key: PUPPETEER_CACHE_DIR
-        value: /opt/render/project/src/.cache/puppeteer
+        value: /opt/render/project/src/server/.cache/puppeteer

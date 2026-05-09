@@ -303,15 +303,60 @@ const Sidebar = ({ isOpen, onClose }) => {
     ? user.user_metadata.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : user?.email?.slice(0, 2).toUpperCase() || "??";
 
+  const asideClass = `fixed left-0 top-0 h-screen w-56 bg-white border-r border-gray-100 flex flex-col z-40 transition-transform duration-300 ${isOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`;
+
+  // ── Recruiter-only minimal sidebar ─────────────────────────
+  if (role === "recruiter") {
+    return (
+      <aside className={asideClass}>
+        <div className="h-16 px-5 border-b border-gray-100 flex items-center justify-between shrink-0">
+          <img src="/logo.png" alt="Seevv" className="h-10 object-contain cursor-pointer" />
+          <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <nav className="flex-1 px-3 py-3 space-y-0.5">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 px-3 mb-1.5">Recruiter</p>
+          <NavLink to="/recruiter" onClick={onClose} className={({ isActive }) => `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${isActive ? "bg-purple-50 text-purple-700" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            Recruiter Portal
+          </NavLink>
+          <NavLink to="/profile" onClick={onClose} className={({ isActive }) => `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${isActive ? "bg-brand-50 text-brand-700" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+            </svg>
+            Profile
+          </NavLink>
+        </nav>
+        <div className="px-3 py-3 border-t border-gray-100 space-y-1">
+          <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg">
+            <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+              <span className="text-[10px] font-bold text-purple-700">{initials}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-900 truncate">{user?.user_metadata?.full_name || profile?.full_name || "Recruiter"}</p>
+              <p className="text-[10px] text-gray-400 truncate">{user?.email}</p>
+            </div>
+          </div>
+          <button onClick={handleSignOut} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all duration-150 cursor-pointer">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Sign out
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
   return (
-    <aside
-      className={`
-        fixed left-0 top-0 h-screen w-56 bg-white border-r border-gray-100
-        flex flex-col z-40 transition-transform duration-300
-        ${isOpen ? "translate-x-0" : "-translate-x-full"}
-        lg:translate-x-0
-      `}
-    >
+    <aside className={asideClass}>
       {/* Brand */}
       <div className="h-16 px-5 border-b border-gray-100 flex items-center justify-between shrink-0">
         <img src="/logo.png" alt="Seevv" className="h-10 object-contain cursor-pointer" />
