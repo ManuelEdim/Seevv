@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store";
 import { Button, Spinner, Card } from "@/components/ui";
+import { useToast } from "@/context/ToastContext";
 import api from "@/lib/api";
 
 const COLUMNS = [
@@ -158,10 +159,14 @@ const JobDetailModal = ({ job, onClose, onStatusChange, navigate }) => {
 const ApplicationTracker = () => {
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [openJob, setOpenJob] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+
+  const PAGE_SIZE = 100;
 
   const loadJobs = useCallback(async () => {
     if (!user) {
@@ -174,9 +179,12 @@ const ApplicationTracker = () => {
         .from("job_targets")
         .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE + 1);
       if (err) throw err;
-      setJobs(data || []);
+      const fetched = data || [];
+      setHasMore(fetched.length > PAGE_SIZE);
+      setJobs(fetched.slice(0, PAGE_SIZE));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -187,9 +195,11 @@ const ApplicationTracker = () => {
   useEffect(() => { loadJobs(); }, [loadJobs]);
 
   const handleStatusChange = async (id, status, notes) => {
+    setError(null);
     try {
       await api.patch(`/jobs/${id}/status`, { status, ...(notes !== undefined && { notes }) });
       setJobs((prev) => prev.map((j) => j.id === id ? { ...j, status, ...(notes !== undefined && { notes }), ...(status === "applied" && { applied_at: new Date().toISOString() }) } : j));
+      toast.success("Application updated.");
     } catch (err) {
       setError(err.message);
     }
@@ -242,6 +252,12 @@ const ApplicationTracker = () => {
         </div>
       )}
 
+      {hasMore && (
+        <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5 text-xs text-amber-800">
+          Showing your most recent 100 applications. Archive older roles to keep this list manageable.
+        </div>
+      )}
+
       {/* Kanban board */}
       {total === 0 ? (
         <Card padding="md">
@@ -258,29 +274,31 @@ const ApplicationTracker = () => {
           </div>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {COLUMNS.map((col) => (
-            <div key={col.key} className="flex flex-col gap-3 min-h-32">
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${col.color}`}>
-                <div className={`w-2 h-2 rounded-full ${col.dot}`} />
-                <span className={`text-xs font-bold uppercase tracking-widest ${col.text}`}>{col.label}</span>
-                <span className={`ml-auto text-xs font-semibold ${col.text}`}>{byStatus[col.key]?.length || 0}</span>
-              </div>
-              {byStatus[col.key]?.map((job) => (
-                <JobCard
-                  key={job.id}
-                  job={job}
-                  onStatusChange={(id, status) => handleStatusChange(id, status)}
-                  onOpen={setOpenJob}
-                />
-              ))}
-              {byStatus[col.key]?.length === 0 && (
-                <div className="border-2 border-dashed border-gray-100 rounded-xl py-6 text-center">
-                  <p className="text-[10px] text-gray-300">None</p>
+        <div className="overflow-x-auto -mx-4 px-4 pb-2">
+          <div className="flex gap-4 min-w-max lg:min-w-0 lg:grid lg:grid-cols-5">
+            {COLUMNS.map((col) => (
+              <div key={col.key} className="flex flex-col gap-3 min-h-32 w-64 lg:w-auto shrink-0">
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${col.color}`}>
+                  <div className={`w-2 h-2 rounded-full ${col.dot}`} />
+                  <span className={`text-xs font-bold uppercase tracking-widest ${col.text}`}>{col.label}</span>
+                  <span className={`ml-auto text-xs font-semibold ${col.text}`}>{byStatus[col.key]?.length || 0}</span>
                 </div>
-              )}
-            </div>
-          ))}
+                {byStatus[col.key]?.map((job) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    onStatusChange={(id, status) => handleStatusChange(id, status)}
+                    onOpen={setOpenJob}
+                  />
+                ))}
+                {byStatus[col.key]?.length === 0 && (
+                  <div className="border-2 border-dashed border-gray-100 rounded-xl py-6 text-center">
+                    <p className="text-[10px] text-gray-300">None</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

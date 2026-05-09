@@ -41,6 +41,9 @@ const CVManager = () => {
       .single()
       .then(({ data }) => {
         setHasVoiceSample(!!(data?.voice_sample && data.voice_sample.trim().length > 50));
+      })
+      .catch(() => {
+        setHasVoiceSample(false);
       });
   }, [user?.id]);
 

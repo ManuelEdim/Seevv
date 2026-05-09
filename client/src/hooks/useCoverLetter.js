@@ -178,6 +178,7 @@ const useCoverLetter = () => {
         });
 
         const generatedContent = response.content;
+        if (!generatedContent) throw new Error("No content returned. Please try again.");
         setContent(generatedContent);
         setWordCount(
           response.word_count ||

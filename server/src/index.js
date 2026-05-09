@@ -104,6 +104,13 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // ─── Start server ──────────────────────────
+const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "GEMINI_API_KEY", "JWT_SECRET"];
+const missingEnv = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missingEnv.length > 0) {
+  console.warn(`⚠️  Missing env vars: ${missingEnv.join(", ")}`);
+  console.warn("   AI features and auth will fail until these are set.");
+}
+
 app.listen(PORT, () => {
   console.log(`
   ┌─────────────────────────────────────┐
@@ -112,6 +119,7 @@ app.listen(PORT, () => {
   │  Status:  Running                   │
   │  Port:    ${PORT}                        │
   │  Mode:    ${process.env.NODE_ENV}          │
+  │  GEMINI:  ${process.env.GEMINI_API_KEY ? "✓ set" : "✗ MISSING"}              │
   │  Health:  /api/health               │
   └─────────────────────────────────────┘
   `);

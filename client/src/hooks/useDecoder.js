@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { decoderService } from "@/lib/decoderService";
@@ -15,6 +15,7 @@ const useDecoder = () => {
   const [isDecoding, setIsDecoding] = useState(false);
   const [activeTab, setActiveTab] = useState("hidden-need");
   const [error, setError] = useState(null);
+  const abortRef = useRef(null);
 
   const fetchJob = useCallback(async () => {
     if (!jobId || !user) return;
@@ -46,23 +47,27 @@ const useDecoder = () => {
   }, [fetchJob]);
 
   const runDecoder = useCallback(async (jobDescription, jobTargetId) => {
+    // Cancel any in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsDecoding(true);
     setError(null);
 
     try {
-      // Real AI call to backend
       const response = await decoderService.analyze(
         jobDescription,
         jobTargetId,
+        controller.signal,
       );
-
+      if (controller.signal.aborted) return;
       setDecoderResult(response.analysis);
     } catch (err) {
-      setError(
-        err.message || "Failed to decode job description. Please try again.",
-      );
+      if (err.name === "AbortError") return;
+      setError(err.message || "Failed to decode job description. Please try again.");
     } finally {
-      setIsDecoding(false);
+      if (!controller.signal.aborted) setIsDecoding(false);
     }
   }, []);
 

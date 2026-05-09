@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/layout";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import useAuth from "@/hooks/useAuth";
 import useSessionTimeout from "@/hooks/useSessionTimeout";
 import SessionTimeoutWarning from "@/components/SessionTimeoutWarning";
@@ -73,6 +74,7 @@ const App = () => {
   }
 
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <Routes>
         {/* Public routes — no layout */}
@@ -343,6 +345,7 @@ const App = () => {
         />
       )}
     </BrowserRouter>
+    </ErrorBoundary>
   );
 };
 
