@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\HomePC\\\\Desktop\\\\Seev\\\\client\\\\src\\\\pages\" -File)",
+      "Bash(Select-Object Name)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
+  }
+}
