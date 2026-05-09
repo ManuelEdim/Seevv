@@ -253,18 +253,20 @@ const JobBoard = () => {
     }
   };
 
+  const displayQuery = query.trim();
+
   return (
     <div>
       {/* Page header */}
       <div className="mb-6">
         <h1 className="text-lg font-bold text-gray-900">Job Board</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Browse live remote jobs and save them directly to your tracker.
+          Search any role across major hiring platforms, or browse live remote listings.
         </p>
       </div>
 
       {/* Search bar */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -275,7 +277,7 @@ const JobBoard = () => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Job title, keywords..."
+              placeholder="Fashion designer, nurse, software engineer…"
               className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
             />
           </div>
@@ -307,24 +309,25 @@ const JobBoard = () => {
         </div>
       </div>
 
-      {/* Search on other platforms */}
-      <div className="mb-6">
-        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
-          Also search on
+      {/* Platform search — primary path for all industries */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
+        <p className="text-xs font-semibold text-gray-500 mb-3">
+          {displayQuery
+            ? `Search "${displayQuery}" on major platforms — covers every industry`
+            : "Search across major hiring platforms — covers every industry"}
         </p>
         <div className="flex flex-wrap gap-2">
           {PLATFORMS.map((p) => (
             <a
               key={p.name}
-              href={p.href(query || "software engineer", "")}
+              href={p.href(displayQuery || "jobs", "")}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-100 bg-white text-xs font-semibold text-gray-700 hover:border-gray-200 hover:shadow-sm transition-all"
-              style={{ "--p-bg": p.bg }}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 hover:bg-white text-xs font-semibold text-gray-700 hover:border-gray-300 hover:shadow-sm transition-all"
             >
               {p.icon}
               {p.name}
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
               </svg>
             </a>
@@ -332,7 +335,22 @@ const JobBoard = () => {
         </div>
       </div>
 
-      {/* Results */}
+      {/* Remote digital results from Remotive */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          Remote digital roles
+        </span>
+        <span className="flex-1 h-px bg-gray-100" />
+        <a
+          href="https://remotive.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11px] text-gray-400 hover:text-brand-600 transition-colors"
+        >
+          powered by Remotive
+        </a>
+      </div>
+
       {isLoading && (
         <div className="flex items-center justify-center py-20">
           <Spinner size="lg" />
@@ -340,42 +358,42 @@ const JobBoard = () => {
       )}
 
       {!isLoading && hasSearched && jobs.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
             </svg>
           </div>
-          <p className="text-sm font-semibold text-gray-700 mb-1">No jobs found</p>
-          <p className="text-xs text-gray-400 max-w-xs">
-            Try different keywords or browse one of the platforms above for more results.
+          <p className="text-sm font-semibold text-gray-700 mb-1">
+            No remote digital roles found{displayQuery ? ` for "${displayQuery}"` : ""}
           </p>
-        </div>
-      )}
-
-      {!isLoading && !hasSearched && (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center mb-4">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#033876" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="7" width="20" height="14" rx="2" />
-              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-              <line x1="12" y1="12" x2="12" y2="16" /><line x1="10" y1="14" x2="14" y2="14" />
-            </svg>
+          <p className="text-xs text-gray-400 max-w-sm mb-5">
+            Remotive lists remote tech, design, and marketing roles. For fashion, retail, healthcare, finance, and all other industries, search the platforms above — they cover every role type.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {PLATFORMS.slice(0, 3).map((p) => (
+              <a
+                key={p.name}
+                href={p.href(displayQuery || "jobs", "")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:border-brand-300 hover:shadow-sm transition-all"
+              >
+                {p.icon}
+                {displayQuery ? `"${displayQuery}" on ${p.name}` : p.name}
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </a>
+            ))}
           </div>
-          <p className="text-sm font-semibold text-gray-700 mb-1">Find your next role</p>
-          <p className="text-xs text-gray-400 max-w-xs">
-            Search remote jobs above, or use the platform links to browse LinkedIn, Indeed, and more. Save any job directly to your tracker.
-          </p>
         </div>
       )}
 
       {!isLoading && jobs.length > 0 && (
         <>
           <p className="text-xs text-gray-400 mb-4">
-            {jobs.length} remote job{jobs.length !== 1 ? "s" : ""} found · powered by{" "}
-            <a href="https://remotive.com" target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline">
-              Remotive
-            </a>
+            {jobs.length} role{jobs.length !== 1 ? "s" : ""} found
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {jobs.map((job) => (
