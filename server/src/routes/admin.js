@@ -203,7 +203,7 @@ router.get("/content/proof-of-work", async (req, res) => {
   const { userId } = req.query;
   try {
     let query = supabase
-      .from("proof_of_work")
+      .from("cv_evidence")
       .select("id, user_id, claim, proof_type, proof_url, created_at, profile:profiles(full_name, email)")
       .order("created_at", { ascending: false })
       .limit(100);

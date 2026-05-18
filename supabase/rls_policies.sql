@@ -101,18 +101,18 @@ CREATE POLICY "Users can view own verification requests" ON verification_request
 CREATE POLICY "Users can insert own verification requests" ON verification_requests
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- ─── proof_of_work ────────────────────────────────────────
-ALTER TABLE proof_of_work ENABLE ROW LEVEL SECURITY;
+-- ─── cv_evidence ──────────────────────────────────────────
+ALTER TABLE cv_evidence ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Users can view own proof of work"   ON proof_of_work;
-DROP POLICY IF EXISTS "Users can insert own proof of work" ON proof_of_work;
-DROP POLICY IF EXISTS "Users can delete own proof of work" ON proof_of_work;
+DROP POLICY IF EXISTS "Users can view own cv evidence"   ON cv_evidence;
+DROP POLICY IF EXISTS "Users can insert own cv evidence" ON cv_evidence;
+DROP POLICY IF EXISTS "Users can delete own cv evidence" ON cv_evidence;
 
-CREATE POLICY "Users can view own proof of work" ON proof_of_work
+CREATE POLICY "Users can view own cv evidence" ON cv_evidence
   FOR SELECT USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert own proof of work" ON proof_of_work
+CREATE POLICY "Users can insert own cv evidence" ON cv_evidence
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can delete own proof of work" ON proof_of_work
+CREATE POLICY "Users can delete own cv evidence" ON cv_evidence
   FOR DELETE USING (auth.uid() = user_id);

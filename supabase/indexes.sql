@@ -30,5 +30,5 @@ CREATE INDEX IF NOT EXISTS idx_verif_user_id        ON verification_requests(use
 CREATE INDEX IF NOT EXISTS idx_verif_status         ON verification_requests(status);
 CREATE INDEX IF NOT EXISTS idx_verif_user_badge     ON verification_requests(user_id, badge_type);
 
--- proof_of_work — filtered by user_id
-CREATE INDEX IF NOT EXISTS idx_proof_of_work_user_id ON proof_of_work(user_id);
+-- cv_evidence — filtered by user_id
+CREATE INDEX IF NOT EXISTS idx_cv_evidence_user_id ON cv_evidence(user_id);

@@ -61,7 +61,7 @@ router.post("/proof-of-work/pdf", async (req, res) => {
   const userId = req.user.id;
   try {
     const [{ data: evidence }, { data: profile }] = await Promise.all([
-      supabase.from("proof_of_work").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+      supabase.from("cv_evidence").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
       supabase.from("profiles").select("full_name").eq("id", userId).single(),
     ]);
 
