@@ -10,11 +10,13 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@sentry/node": "^8.0.0",
     "@supabase/supabase-js": "latest",
     "cors": "latest",
     "docx": "^9.6.1",
     "dotenv": "latest",
     "express": "latest",
+    "express-rate-limit": "^7.5.0",
     "helmet": "latest",
     "mammoth": "^1.12.0",
     "morgan": "latest",
