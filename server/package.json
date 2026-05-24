@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@sentry/node": "^8.0.0",
+    "@sentry/node": "^8.55.2",
     "@supabase/supabase-js": "latest",
     "cors": "latest",
     "docx": "^9.6.1",

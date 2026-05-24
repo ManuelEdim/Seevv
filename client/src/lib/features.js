@@ -18,10 +18,14 @@ export const FEATURES = {
   interview_prep:  { label: "Interview Prep",           minPlan: "pro"      },
   mock_interview:  { label: "Mock Interview",           minPlan: "pro"      },
   analytics:       { label: "Application Analytics",   minPlan: "pro"      },
-  verification:    { label: "Verification Badge",       minPlan: "pro_plus" },
-  recruiter_mode:  { label: "Recruiter Profile",        minPlan: "pro_plus" },
-  custom_branding: { label: "Custom Branding",          minPlan: "pro_plus" },
-  api_access:      { label: "API Access",               minPlan: "pro_plus" },
+  verification:       { label: "Verification Badge",       minPlan: "pro_plus" },
+  recruiter_mode:     { label: "Recruiter Profile",        minPlan: "pro_plus" },
+  custom_branding:    { label: "Custom Branding",          minPlan: "pro_plus" },
+  api_access:         { label: "API Access",               minPlan: "pro_plus" },
+  rejection_intel:    { label: "Rejection Intelligence",   minPlan: "starter"  },
+  negotiation_coach:  { label: "Negotiation Coach",        minPlan: "pro"      },
+  recruiter_outreach: { label: "Recruiter Outreach",       minPlan: "pro"      },
+  apply_assist:       { label: "Apply Assist",             minPlan: "pro"      },
 };
 
 export const PLAN_LABELS = {

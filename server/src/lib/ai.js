@@ -915,6 +915,187 @@ Return ONLY valid JSON.`;
   return generateContent(prompt, "flash", { json: true, temperature: 0.3, maxTokens: 2048 });
 };
 
+// ─────────────────────────────────────────────────────────────
+// V4 — REJECTION INTELLIGENCE / NEGOTIATION / OUTREACH / APPLY
+// ─────────────────────────────────────────────────────────────
+
+// ─── Rejection Intelligence ────────────────────────────────
+
+export const analyzeRejection = async (jobTitle, company, jobDescription, cvText, matchScore, atsScore) => {
+  const prompt = `You are an expert career coach analyzing why a job application was likely rejected. Be honest, specific, and constructive.
+
+Job Title: ${jobTitle}
+Company: ${company || "Not specified"}
+Job Description (excerpt): ${(jobDescription || "Not provided").slice(0, 2000)}
+Candidate's CV/Application (excerpt): ${(cvText || "CV not available").slice(0, 2000)}
+Match Score: ${matchScore || "Unknown"}%
+ATS Score: ${atsScore || "Unknown"}%
+
+Analyze why this application was likely rejected.
+
+Return ONLY valid JSON:
+{
+  "likely_reasons": ["specific reason 1", "specific reason 2", "specific reason 3"],
+  "critical_gaps": ["gap between CV and JD 1", "gap 2"],
+  "what_to_fix": ["actionable fix 1 for next application", "fix 2", "fix 3"],
+  "positioning_advice": "How to position better for this role type next time — 2-3 sentences",
+  "confidence": "high|medium|low",
+  "silver_linings": ["what this application demonstrated that can be reused"]
+}`;
+
+  return generateContent(prompt, "flash", { json: true, temperature: 0.3, maxTokens: 2048 });
+};
+
+export const analyzeRejectionPatterns = async (rejectedJobs) => {
+  const allReasons = rejectedJobs.flatMap((j) => j.analysis?.likely_reasons || []);
+  const allGaps = rejectedJobs.flatMap((j) => j.analysis?.critical_gaps || []);
+
+  const prompt = `You are an expert career coach. A job seeker has been rejected from ${rejectedJobs.length} roles.
+
+Roles rejected from: ${rejectedJobs.map((j) => `${j.role_title} at ${j.company}`).join(", ")}
+
+Rejection reasons collected across all applications:
+${allReasons.slice(0, 20).join("\n")}
+
+Critical gaps identified:
+${allGaps.slice(0, 15).join("\n")}
+
+Identify the key patterns and give a prioritized action plan.
+
+Return ONLY valid JSON:
+{
+  "top_patterns": [
+    { "pattern": "pattern name", "description": "what this means in practice", "severity": "high|medium|low" }
+  ],
+  "root_cause": "The single core issue causing repeated rejections — 2 sentences",
+  "priority_actions": ["most important action first", "second action", "third action"],
+  "quick_wins": ["something they can fix this week", "quick win 2"],
+  "encouraging_note": "A specific encouraging note based on what they ARE doing right",
+  "estimated_timeline": "Realistic timeline to see improvement if they follow the advice"
+}`;
+
+  return generateContent(prompt, "pro", { json: true, temperature: 0.4, maxTokens: 3000 });
+};
+
+// ─── Offer Negotiation Coach ────────────────────────────────
+
+export const generateNegotiationCoaching = async (roleTitle, company, location, offeredSalary, currency, experience, targetSalary) => {
+  const prompt = `You are an expert salary negotiation coach.
+
+Role: ${roleTitle}
+Company: ${company || "Not specified"}
+Location: ${location || "Not specified"}
+Offered Salary: ${offeredSalary} ${currency}
+Years of Experience: ${experience || "Not specified"}
+Target Salary: ${targetSalary ? `${targetSalary} ${currency}` : "Not specified"}
+
+Provide a comprehensive salary negotiation strategy.
+
+Return ONLY valid JSON:
+{
+  "market_range": { "low": "value", "mid": "value", "high": "value", "currency": "${currency}", "source_note": "Based on AI training data — verify at Glassdoor, LinkedIn Salary, levels.fyi" },
+  "assessment": "Is the offer fair, low, or good? 2 sentences",
+  "recommended_ask": "Specific number or range to request with brief rationale",
+  "counter_offer_script": "Word-for-word 150-200 word script to use on the negotiation call",
+  "email_template": { "subject": "Subject line", "body": "200-250 word professional counter-offer email body" },
+  "objection_handlers": [
+    { "objection": "That is the top of our band", "response": "Your response" },
+    { "objection": "We cannot move on salary but can offer other benefits", "response": "Your response" },
+    { "objection": "Other candidates are accepting this rate", "response": "Your response" },
+    { "objection": "We need to check with leadership", "response": "How to follow up professionally" }
+  ],
+  "negotiation_tips": ["specific tip 1", "tip 2", "tip 3"],
+  "walk_away_point": "When and how to decline professionally",
+  "non_salary_items": ["equity or stock options", "remote flexibility", "signing bonus", "professional development budget", "extra PTO"]
+}`;
+
+  return generateContent(prompt, "pro", { json: true, temperature: 0.5, maxTokens: 6000 });
+};
+
+export const simulateNegotiationRoleplay = async (userMessage, context, history) => {
+  const historyText = (history || [])
+    .map((h) => `${h.role === "user" ? "Candidate" : "Recruiter"}: ${h.content}`)
+    .join("\n");
+
+  const prompt = `You are a tough but fair HR recruiter in a salary negotiation roleplay. Be realistic — sometimes push back, sometimes show flexibility.
+
+Context: ${context || "Candidate is negotiating salary for a new position"}
+
+Conversation so far:
+${historyText}
+
+Candidate just said: "${userMessage}"
+
+Respond as the recruiter in 2-4 sentences. Then on a new line add exactly: [COACH: your coaching note for the candidate about what they did well or should improve]`;
+
+  return generateContent(prompt, "flash", { temperature: 0.8, maxTokens: 500 });
+};
+
+// ─── Recruiter Outreach Generator ──────────────────────────
+
+export const generateOutreachMessages = async (recruiterName, recruiterRole, company, targetRole, recruiterNotes, cvText, voiceSample) => {
+  const prompt = `You are an expert at writing personalized, high-response professional outreach messages for job seekers. Never be generic.
+
+Recruiter Name: ${recruiterName}
+Recruiter Role: ${recruiterRole || "Recruiter / Hiring Manager"}
+Company: ${company}
+Target Role: ${targetRole}
+Additional Context: ${recruiterNotes || "None"}
+
+Candidate background (from CV):
+${(cvText || "Not provided").slice(0, 1500)}
+
+${voiceSample ? `Mirror this candidate's writing style:\n${voiceSample.slice(0, 400)}` : "Use professional, warm, direct tone."}
+
+Return ONLY valid JSON:
+{
+  "linkedin_connection_note": "Under 300 characters. Personalized. Do not start with 'Hi I saw your profile'.",
+  "linkedin_message": "150-250 words. After connecting. Reference something specific about ${company}. End with low-pressure CTA.",
+  "follow_up_email": { "subject": "Compelling subject line", "body": "180-250 words. References unanswered LinkedIn message. Keeps positive energy." },
+  "personalization_checklist": ["specific thing to research about ${company}", "specific angle to reference", "recent news or product to mention"],
+  "best_send_time": "When to send for best response rates",
+  "avoid": ["common mistake that kills response rate", "another mistake to avoid"]
+}`;
+
+  return generateContent(prompt, "pro", { json: true, temperature: 0.7, maxTokens: 4000 });
+};
+
+// ─── Apply Assist — Application Bundle ─────────────────────
+
+export const generateApplicationBundle = async (roleTitle, company, jobDescription, cvText, candidateName) => {
+  const prompt = `You are helping a job seeker submit a fast, polished application. Generate everything they need to fill in any job application form in under 5 minutes.
+
+Applicant: ${candidateName || "The applicant"}
+Role: ${roleTitle}
+Company: ${company || "The company"}
+
+Job Description:
+${jobDescription.slice(0, 2000)}
+
+Their CV:
+${(cvText || "Not provided").slice(0, 2000)}
+
+Return ONLY valid JSON:
+{
+  "elevator_pitch": "60-word punchy personal statement tailored to this exact role and company",
+  "screening_answers": [
+    { "question": "Tell me about yourself", "answer": "Tailored 100-word answer drawing from their CV" },
+    { "question": "Why do you want this role?", "answer": "Tailored 80-word answer specific to this role" },
+    { "question": "Why ${company || "this company"}?", "answer": "Tailored 70-word answer with company-specific hooks" },
+    { "question": "What is your greatest strength for this role?", "answer": "60-word answer with a specific example from their CV" },
+    { "question": "Describe a challenge you overcame", "answer": "STAR-format 100-word answer drawn from their CV experience" },
+    { "question": "Where do you see yourself in 5 years?", "answer": "60-word answer aligned with this career trajectory" },
+    { "question": "What are your salary expectations?", "answer": "Professional deflection strategy with range placeholder" }
+  ],
+  "key_skills_to_highlight": ["skill from their CV that matches JD 1", "skill 2", "skill 3", "skill 4"],
+  "ats_keywords_to_include": ["keyword from JD 1", "keyword 2", "keyword 3", "keyword 4", "keyword 5"],
+  "application_tips": ["specific tip for this company or role type", "tip 2", "tip 3"],
+  "things_to_avoid": ["red flag to avoid mentioning for this role type", "thing 2"]
+}`;
+
+  return generateContent(prompt, "pro", { json: true, temperature: 0.6, maxTokens: 6000 });
+};
+
 export default {
   analyzeJobDescription,
   parseJobDescription,

@@ -41,6 +41,10 @@ import voiceMirrorRouter from "./routes/voiceMirror.js";
 import brandingRouter from "./routes/branding.js";
 import apiAccessRouter from "./routes/apiAccess.js";
 import verificationRouter from "./routes/verification.js";
+import rejectionIntelRouter from "./routes/rejectionIntel.js";
+import negotiationRouter from "./routes/negotiation.js";
+import outreachRouter from "./routes/outreach.js";
+import applyAssistRouter from "./routes/applyAssist.js";
 
 // Middleware
 import errorHandler from "./middleware/errorHandler.js";
@@ -107,6 +111,10 @@ const AI_ROUTES = [
   "/api/voice-mirror",
   "/api/skills",
   "/api/branding",
+  "/api/rejection-intel",
+  "/api/negotiation",
+  "/api/outreach",
+  "/api/apply-assist",
 ];
 app.use(AI_ROUTES, aiLimiter);
 
@@ -134,6 +142,10 @@ app.use("/api/voice-mirror", voiceMirrorRouter);
 app.use("/api/branding", brandingRouter);
 app.use("/api/api-access", apiAccessRouter);
 app.use("/api/verification", verificationRouter);
+app.use("/api/rejection-intel", rejectionIntelRouter);
+app.use("/api/negotiation", negotiationRouter);
+app.use("/api/outreach", outreachRouter);
+app.use("/api/apply-assist", applyAssistRouter);
 
 // ─── 404 handler ───────────────────────────────────────────
 app.use((req, res) => {

@@ -38,6 +38,10 @@ import VoiceMirroring from "@/pages/VoiceMirroring";
 import ApiAccess from "@/pages/ApiAccess";
 import CustomBranding from "@/pages/CustomBranding";
 import Verification from "@/pages/Verification";
+import RejectionIntel from "@/pages/RejectionIntel";
+import NegotiationCoach from "@/pages/NegotiationCoach";
+import RecruiterOutreach from "@/pages/RecruiterOutreach";
+import ApplyAssist from "@/pages/ApplyAssist";
 
 const App = () => {
   const { isLoading } = useAuth();
@@ -327,6 +331,11 @@ const App = () => {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/rejection-intel" element={<ProtectedRoute><AppLayout><RejectionIntel /></AppLayout></ProtectedRoute>} />
+        <Route path="/negotiation-coach" element={<ProtectedRoute><AppLayout><NegotiationCoach /></AppLayout></ProtectedRoute>} />
+        <Route path="/recruiter-outreach" element={<ProtectedRoute><AppLayout><RecruiterOutreach /></AppLayout></ProtectedRoute>} />
+        <Route path="/apply-assist" element={<ProtectedRoute><AppLayout><ApplyAssist /></AppLayout></ProtectedRoute>} />
 
         {/* 403 / 401 */}
         <Route path="/unauthorized" element={<Unauthorised />} />

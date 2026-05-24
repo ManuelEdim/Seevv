@@ -160,6 +160,18 @@ const FEATURE_GROUPS = [
           </svg>
         ),
       },
+      {
+        key: "rejection_intel",
+        label: "Rejection Intel",
+        desc: "Turn rejections into learnable data",
+        route: "/rejection-intel",
+        grad: ["#dc2626", "#b91c1c"],
+        icon: (c) => (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+          </svg>
+        ),
+      },
     ],
   },
   {
@@ -228,6 +240,42 @@ const FEATURE_GROUPS = [
         icon: (c) => (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+        ),
+      },
+      {
+        key: "negotiation_coach",
+        label: "Negotiation Coach",
+        desc: "Win every salary conversation",
+        route: "/negotiation-coach",
+        grad: ["#059669", "#047857"],
+        icon: (c) => (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+        ),
+      },
+      {
+        key: "recruiter_outreach",
+        label: "Recruiter Outreach",
+        desc: "Personalized messages that get replies",
+        route: "/recruiter-outreach",
+        grad: ["#7c3aed", "#6d28d9"],
+        icon: (c) => (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        ),
+      },
+      {
+        key: "apply_assist",
+        label: "Apply Assist",
+        desc: "Apply to any role in under 2 minutes",
+        route: "/apply-assist",
+        grad: ["#0d9488", "#0f766e"],
+        icon: (c) => (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
           </svg>
         ),
       },
@@ -389,9 +437,9 @@ const LockedTierCard = ({ group, navigate }) => {
         {group.tiles.map((tile) => (
           <div
             key={tile.label}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-gray-100 text-xs font-medium text-gray-500`}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-gray-100 text-xs font-medium text-gray-500"
           >
-            <span className="w-3.5 h-3.5 shrink-0">{tile.icon("#9ca3af")}</span>
+            <span className="w-3.5 h-3.5 shrink-0 [&>svg]:w-3.5 [&>svg]:h-3.5">{tile.icon("#9ca3af")}</span>
             {tile.label}
           </div>
         ))}
@@ -484,7 +532,7 @@ const HeroBanner = ({ name, plan, metrics, onAddJob }) => {
   })();
 
   const subtitle = metrics.totalApplications > 0
-    ? `${metrics.totalApplications} role${metrics.totalApplications !== 1 ? "s" : ""} tracked · ${metrics.cvVersions} tailored CV version${metrics.cvVersions !== 1 ? "s" : ""}`
+    ? `${metrics.totalApplications} role${metrics.totalApplications !== 1 ? "s" : ""} applied to · ${metrics.cvVersions} tailored CV version${metrics.cvVersions !== 1 ? "s" : ""}`
     : "Ready to land your next role? Add a job target to get started.";
 
   return (
@@ -640,7 +688,7 @@ const Dashboard = () => {
 
       {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-8">
-        <MetricCard label="Applications"     value={metrics.totalApplications}                                    sub="roles tracked"       color="brand" />
+        <MetricCard label="Applications"     value={metrics.totalApplications}                                    sub="roles applied to"    color="brand" />
         <MetricCard label="Avg match score"  value={metrics.avgMatchScore > 0 ? `${metrics.avgMatchScore}%` : "—"} sub="across all versions"  color="teal" />
         <MetricCard label="Interviews"       value={metrics.interviews}                                           sub="from applications"    color="amber" />
         <MetricCard label="CV versions"      value={metrics.cvVersions}                                           sub="tailored versions"    color="coral" />

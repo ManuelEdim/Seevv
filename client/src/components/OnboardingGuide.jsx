@@ -230,7 +230,15 @@ const OnboardingGuide = () => {
               </p>
             </div>
 
-            {/* Step dots */}
+            {/* CTA */}
+            <button
+              onClick={handleGoTo}
+              className="w-full text-xs text-center py-2 bg-brand-50 border border-brand-100 text-brand-700 rounded-lg font-semibold hover:bg-brand-100 cursor-pointer transition-colors mb-3"
+            >
+              {current.cta}
+            </button>
+
+            {/* Step dots + navigation */}
             <div className="flex items-center justify-between">
               <div className="flex gap-1.5">
                 {steps.map((_, i) => (
@@ -257,12 +265,6 @@ const OnboardingGuide = () => {
                     ← Back
                   </button>
                 )}
-                <button
-                  onClick={handleGoTo}
-                  className="text-xs text-brand-600 hover:text-brand-800 font-semibold cursor-pointer transition-colors"
-                >
-                  {current.cta}
-                </button>
                 <button
                   onClick={handleNext}
                   className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-semibold cursor-pointer transition-colors"
