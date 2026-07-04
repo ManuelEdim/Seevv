@@ -529,6 +529,7 @@ const CVEditor = () => {
   const [activePanel, setActivePanel] = useState("editor");
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingDocx, setIsExportingDocx] = useState(false);
+  const [pdfTemplate, setPdfTemplate] = useState("classic");
   const [isSavingDecisions, setIsSavingDecisions] = useState(false);
   const [blindSpots, setBlindSpots] = useState(null);
   const [isLoadingBlindSpots, setIsLoadingBlindSpots] = useState(false);
@@ -673,7 +674,7 @@ const CVEditor = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ versionId: version.id }),
+          body: JSON.stringify({ versionId: version.id, template: pdfTemplate }),
         },
       );
 
@@ -877,6 +878,28 @@ const CVEditor = () => {
             </Button>
           )}
 
+          {exportReady && (
+            <div className="flex items-center gap-1 border border-gray-200 rounded-lg p-0.5 bg-gray-50">
+              {[
+                { id: "classic", label: "Classic" },
+                { id: "two-column", label: "2-Col" },
+                { id: "executive", label: "Exec" },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setPdfTemplate(t.id)}
+                  className={`text-xs px-2 py-1 rounded-md font-medium transition-all cursor-pointer ${
+                    pdfTemplate === t.id
+                      ? "bg-white text-brand-700 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           <Button
             variant="outline"
             size="sm"
@@ -886,7 +909,7 @@ const CVEditor = () => {
             title={
               !exportReady
                 ? `${pendingDecisions} bullets still need review`
-                : "Export PDF"
+                : `Export as ${pdfTemplate === "two-column" ? "Two-column" : pdfTemplate === "executive" ? "Executive brief" : "Classic"} PDF`
             }
           >
             {exportReady ? "Export PDF" : `${pendingDecisions} pending`}
@@ -1074,6 +1097,27 @@ const CVEditor = () => {
             >
               Save all changes
             </Button>
+            {exportReady && (
+              <div className="flex items-center gap-1 border border-gray-200 rounded-lg p-0.5 bg-gray-50 mb-2">
+                {[
+                  { id: "classic", label: "Classic" },
+                  { id: "two-column", label: "Two-column" },
+                  { id: "executive", label: "Executive" },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setPdfTemplate(t.id)}
+                    className={`flex-1 text-xs px-2 py-1.5 rounded-md font-medium transition-all cursor-pointer ${
+                      pdfTemplate === t.id
+                        ? "bg-white text-brand-700 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <Button
               variant={exportReady ? "primary" : "outline"}
               fullWidth

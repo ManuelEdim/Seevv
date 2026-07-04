@@ -2,7 +2,7 @@ import { generateCVPdf } from "../lib/pdfGenerator.js";
 import { supabase } from "../lib/supabase.js";
 
 export const exportCVAsPdf = async (req, res) => {
-  const { versionId } = req.body;
+  const { versionId, template = "classic" } = req.body;
   const userId = req.user.id;
 
   try {
@@ -209,6 +209,7 @@ export const exportCVAsPdf = async (req, res) => {
       projects,
       tone: version.tone || "balanced",
       branding: profile?.branding || {},
+      template,
     });
 
     // ── Filename: "Software Engineer (Stripe) - Emmanuel Okang Edim.pdf" ──

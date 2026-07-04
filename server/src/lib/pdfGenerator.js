@@ -12,9 +12,16 @@ export const generateCVPdf = async (cvData) => {
     projects,
     tone = "balanced",
     branding = {},
+    template = "classic",
   } = cvData;
 
-  const html = buildCVHtml({
+  const builderMap = {
+    "two-column": buildTwoColumnHtml,
+    executive: buildExecutiveBriefHtml,
+  };
+  const builder = builderMap[template] || buildCVHtml;
+
+  const html = builder({
     fullName,
     contactInfo,
     summary,
@@ -120,6 +127,97 @@ export const generateProofOfWorkPdf = async ({ fullName, evidence }) => {
     await page.setContent(html, { waitUntil: "networkidle0" });
     return await page.pdf({ format: "A4", margin: { top: "0", right: "0", bottom: "0", left: "0" }, printBackground: true });
   } finally { await browser.close(); }
+};
+
+// ─── Two-column template ──────────────────────────────────
+const buildTwoColumnHtml = ({ fullName, contactInfo, summary, experience, skills, education, achievements, projects, tone, branding = {} }) => {
+  const accent = branding.accentColor || (tone === "bold" ? "#1a1a2e" : "#0d1f3c");
+  const esc = escapeHtml;
+
+  const contactLines = (contactInfo || "").split("\n").filter(Boolean);
+  const expHtml = (experience || []).map((r) => `
+    <div style="margin-bottom:8px;page-break-inside:avoid">
+      <p style="font-size:9.5pt;font-weight:700;color:#111;margin:0">${esc(r.title)}</p>
+      ${r.company ? `<p style="font-size:8.5pt;color:#555;font-style:italic;margin:1px 0">${esc(r.company)}${r.period ? ` · ${esc(r.period)}` : ""}</p>` : ""}
+      <ul style="margin:3px 0 0 14px;padding:0">${(r.bullets||[]).map(b=>`<li style="font-size:9pt;color:#333;line-height:1.4;margin-bottom:1px">${esc(b)}</li>`).join("")}</ul>
+    </div>`).join("");
+
+  const eduHtml = (education||[]).map(e=>`<p style="font-size:9pt;color:#333;margin:0 0 2px">${esc(e)}</p>`).join("");
+  const achHtml = (achievements||[]).map(a=>`<li style="font-size:9pt;color:#333;line-height:1.4;margin-bottom:1px">${esc(a)}</li>`).join("");
+  const projHtml = (projects||[]).map(p=>`<li style="font-size:9pt;color:#333;line-height:1.4;margin-bottom:1px">${esc(p)}</li>`).join("");
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,Arial,sans-serif;font-size:9.5pt;color:#1a1a1a;background:#fff}
+  .wrap{display:flex;min-height:100vh}
+  .sidebar{width:32%;background:${accent};color:#fff;padding:24px 18px;flex-shrink:0}
+  .main{flex:1;padding:24px 20px}
+  .name{font-size:16pt;font-weight:700;color:#fff;line-height:1.2;margin-bottom:4px;word-break:break-word}
+  .contact-item{font-size:8pt;color:rgba(255,255,255,0.75);margin-bottom:2px;word-break:break-all}
+  .s-label{font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.5);margin:16px 0 6px;padding-bottom:3px;border-bottom:1px solid rgba(255,255,255,0.2)}
+  .skill-item{font-size:8.5pt;color:rgba(255,255,255,0.85);margin-bottom:2px}
+  .m-label{font-size:8.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${accent};border-bottom:1.5px solid ${accent};padding-bottom:2px;margin:14px 0 7px}
+  .summary{font-size:9.5pt;color:#333;line-height:1.5;text-align:justify}
+</style></head><body><div class="wrap">
+  <div class="sidebar">
+    <p class="name">${esc(fullName||"Your Name")}</p>
+    <div style="margin-top:10px">${contactLines.map(l=>`<p class="contact-item">${esc(l)}</p>`).join("")}</div>
+    ${skills&&skills.length?`<p class="s-label">Skills</p>${skills.map(s=>`<p class="skill-item">· ${esc(s)}</p>`).join("")}`:""}
+    ${education&&education.length?`<p class="s-label">Education</p>${(education||[]).map(e=>`<p class="skill-item" style="white-space:pre-line">${esc(e)}</p>`).join("")}`:""}
+  </div>
+  <div class="main">
+    ${summary?`<p class="m-label">Summary</p><p class="summary">${esc(summary)}</p>`:""}
+    ${experience&&experience.length?`<p class="m-label">Experience</p>${expHtml}`:""}
+    ${achHtml?`<p class="m-label">Achievements</p><ul style="margin-left:14px">${achHtml}</ul>`:""}
+    ${projHtml?`<p class="m-label">Projects</p><ul style="margin-left:14px">${projHtml}</ul>`:""}
+  </div>
+</div></body></html>`;
+};
+
+// ─── Executive brief template ─────────────────────────────
+const buildExecutiveBriefHtml = ({ fullName, contactInfo, summary, experience, skills, education, achievements, projects, tone, branding = {} }) => {
+  const accent = branding.accentColor || (tone === "bold" ? "#1a1a2e" : "#0d2d5a");
+  const esc = escapeHtml;
+
+  const contactOneLine = (contactInfo||"").split("\n").filter(Boolean).join("  ·  ");
+  const expHtml = (experience||[]).map((r) => `
+    <div style="margin-bottom:7px;page-break-inside:avoid">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:9.5pt;font-weight:700;color:#111">${esc(r.title)}</span>
+        ${r.period?`<span style="font-size:8pt;color:#777">${esc(r.period)}</span>`:""}
+      </div>
+      ${r.company?`<p style="font-size:8.5pt;color:#555;margin:1px 0 3px;font-style:italic">${esc(r.company)}</p>`:""}
+      <ul style="margin:0 0 0 13px;padding:0">${(r.bullets||[]).map(b=>`<li style="font-size:8.5pt;color:#333;line-height:1.4;margin-bottom:1px">${esc(b)}</li>`).join("")}</ul>
+    </div>`).join("");
+
+  const skillsLine = (skills||[]).join("  ·  ");
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Georgia,'Times New Roman',serif;font-size:9.5pt;color:#1a1a1a;background:#fff;padding:0}
+  .hdr{background:${accent};color:#fff;padding:22px 28px 18px;text-align:center}
+  .hdr-name{font-size:22pt;font-weight:700;letter-spacing:0.5px;margin-bottom:4px}
+  .hdr-contact{font-size:8pt;opacity:0.75;letter-spacing:0.02em}
+  .body{padding:18px 28px}
+  .sec-title{font-size:8.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:${accent};margin:14px 0 5px;padding-bottom:3px;border-bottom:1.5px solid ${accent}}
+  .summary{font-size:9.5pt;line-height:1.6;color:#333;text-align:justify}
+  .skills-bar{font-size:8.5pt;color:#333;line-height:1.6}
+</style></head><body>
+<div class="hdr">
+  <p class="hdr-name">${esc(fullName||"Your Name")}</p>
+  ${contactOneLine?`<p class="hdr-contact">${esc(contactOneLine)}</p>`:""}
+</div>
+<div class="body">
+  ${summary?`<p class="sec-title">Executive Summary</p><p class="summary">${esc(summary)}</p>`:""}
+  ${experience&&experience.length?`<p class="sec-title">Career History</p>${expHtml}`:""}
+  ${achievements&&achievements.length?`<p class="sec-title">Key Achievements</p><ul style="margin-left:14px">${(achievements||[]).map(a=>`<li style="font-size:8.5pt;color:#333;line-height:1.4;margin-bottom:2px">${esc(a)}</li>`).join("")}</ul>`:""}
+  ${skillsLine?`<p class="sec-title">Core Competencies</p><p class="skills-bar">${esc(skillsLine)}</p>`:""}
+  ${education&&education.length?`<p class="sec-title">Education</p>${(education||[]).map(e=>`<p style="font-size:8.5pt;color:#333;margin-bottom:2px">${esc(e)}</p>`).join("")}`:""}
+  ${projects&&projects.length?`<p class="sec-title">Projects</p><ul style="margin-left:14px">${(projects||[]).map(p=>`<li style="font-size:8.5pt;color:#333;line-height:1.4;margin-bottom:1px">${esc(p)}</li>`).join("")}</ul>`:""}
+</div>
+</body></html>`;
 };
 
 const buildCVHtml = ({

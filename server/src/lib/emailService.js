@@ -129,6 +129,118 @@ export async function sendVerificationRejected(userId, badgeType, reason = "") {
   });
 }
 
+// ─── Interview reminder ───────────────────────────────────────
+export async function sendInterviewReminder(userId, { jobTitle, company, interviewDate }) {
+  if (!await isEmailEnabled()) return;
+  const user = await getUserProfile(userId);
+  if (!user?.email) return;
+
+  const provider = await getEmailProvider();
+  const from = await getFromAddress();
+  const dateStr = new Date(interviewDate).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const timeStr = new Date(interviewDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
+  await provider.send({
+    from,
+    to: user.email,
+    subject: `Interview reminder: ${jobTitle} at ${company} — tomorrow`,
+    html: brandedHtml(`
+      <h2 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#111827;">Interview reminder</h2>
+      <p style="margin:0 0 20px;font-size:15px;color:#4b5563;line-height:1.6;">
+        Hi${user.full_name ? ` ${user.full_name.split(" ")[0]}` : ""},<br>
+        you have an interview tomorrow. Here are the details:
+      </p>
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+        <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#0c4a6e;">${jobTitle}</p>
+        <p style="margin:0 0 4px;font-size:13px;color:#0369a1;">${company}</p>
+        <p style="margin:0;font-size:13px;color:#0369a1;">${dateStr} at ${timeStr}</p>
+      </div>
+      <a href="https://seevv.io/tracker"
+        style="display:inline-block;background:#1d9e75;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
+        View application →
+      </a>
+    `),
+  });
+}
+
+// ─── Job match alert ──────────────────────────────────────────
+export async function sendJobMatchAlert(userId, jobs) {
+  if (!await isEmailEnabled()) return;
+  if (!jobs?.length) return;
+  const user = await getUserProfile(userId);
+  if (!user?.email) return;
+
+  const provider = await getEmailProvider();
+  const from = await getFromAddress();
+  const jobRows = jobs.slice(0, 5).map((j) => `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;vertical-align:top">
+        <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#111827;">${j.title || j.job_title || ""}</p>
+        <p style="margin:0;font-size:12px;color:#6b7280;">${j.company || j.company_name || ""}${j.location ? ` · ${j.location}` : ""}</p>
+      </td>
+    </tr>`).join("");
+
+  await provider.send({
+    from,
+    to: user.email,
+    subject: `${jobs.length} new job${jobs.length > 1 ? "s" : ""} matching your saved search`,
+    html: brandedHtml(`
+      <h2 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#111827;">New job matches</h2>
+      <p style="margin:0 0 20px;font-size:15px;color:#4b5563;line-height:1.6;">
+        Hi${user.full_name ? ` ${user.full_name.split(" ")[0]}` : ""},<br>
+        we found ${jobs.length} new job${jobs.length > 1 ? "s" : ""} matching your saved search.
+      </p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+        ${jobRows}
+      </table>
+      <a href="https://seevv.io/jobs"
+        style="display:inline-block;background:#1d9e75;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
+        View all matches →
+      </a>
+    `),
+  });
+}
+
+// ─── Weekly digest ────────────────────────────────────────────
+export async function sendWeeklyDigest(userId, { applications, upcomingInterviews, matchScore }) {
+  if (!await isEmailEnabled()) return;
+  const user = await getUserProfile(userId);
+  if (!user?.email) return;
+
+  const provider = await getEmailProvider();
+  const from = await getFromAddress();
+  const appCount = applications?.length || 0;
+  const interviewCount = upcomingInterviews?.length || 0;
+  const avgScore = matchScore || 0;
+
+  await provider.send({
+    from,
+    to: user.email,
+    subject: "Your Seevv weekly summary",
+    html: brandedHtml(`
+      <h2 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#111827;">Your week in review</h2>
+      <p style="margin:0 0 20px;font-size:15px;color:#4b5563;line-height:1.6;">
+        Hi${user.full_name ? ` ${user.full_name.split(" ")[0]}` : ""},<br>here's what happened with your job search this week.
+      </p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+        ${[
+          ["Applications in progress", appCount],
+          ["Upcoming interviews", interviewCount],
+          ["Avg. CV match score", avgScore ? `${avgScore}%` : "—"],
+        ].map(([label, value]) => `
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-size:14px;color:#374151;">${label}</td>
+            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;font-size:14px;font-weight:700;color:#111827;text-align:right;">${value}</td>
+          </tr>`).join("")}
+      </table>
+      <a href="https://seevv.io/dashboard"
+        style="display:inline-block;background:#0d1f3c;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
+        Go to dashboard →
+      </a>
+    `),
+  });
+}
+
 // ─── Welcome email (after signup) ─────────────────────────────
 export async function sendWelcome(userId) {
   if (!await isEmailEnabled()) return;

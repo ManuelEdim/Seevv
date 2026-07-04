@@ -54,6 +54,7 @@ import cvReviewRouter from "./routes/cvReview.js";
 import webhooksRouter from "./routes/webhooks.js";
 import whitelabelRouter from "./routes/whitelabel.js";
 import atsRouter from "./routes/ats.js";
+import cronRouter from "./routes/cron.js";
 
 // Middleware
 import errorHandler from "./middleware/errorHandler.js";
@@ -170,6 +171,7 @@ app.use("/api/cv-review", cvReviewRouter);
 app.use("/api/webhooks", webhooksRouter);
 app.use("/api/whitelabel", whitelabelRouter);
 app.use("/api/ats", atsRouter);
+app.use("/api/cron", cronRouter);
 
 // ─── 404 handler ───────────────────────────────────────────
 app.use((req, res) => {

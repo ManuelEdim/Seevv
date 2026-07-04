@@ -111,6 +111,8 @@ const Signup = () => {
         });
       }
       toast.success("Account created! Welcome to Seevv.");
+      // Fire-and-forget welcome email — don't block navigation on it
+      api.post("/auth/welcome").catch(() => {});
       setTimeout(() => navigate(role === "recruiter" ? "/recruiter" : "/dashboard"), 800);
     } catch (error) {
       const message = error.message || "Something went wrong. Please try again.";
@@ -145,7 +147,7 @@ const Signup = () => {
           className="absolute inset-0 w-full h-full object-cover object-top"
         />
         {/* Dark overlay — heavier at bottom */}
-        <div className="absolute inset-0 bg-gradient-to-b from-brand-900/65 via-brand-900/70 to-brand-900/98" />
+        <div className="absolute inset-0 bg-linear-to-b from-brand-900/65 via-brand-900/70 to-brand-900/98" />
 
         {/* Logo */}
         <div className="relative z-10 p-10 shrink-0">
