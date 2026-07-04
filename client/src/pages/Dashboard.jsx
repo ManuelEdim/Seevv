@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store";
 import {
@@ -646,6 +646,22 @@ const Dashboard = () => {
     }
   };
 
+  const [upcomingInterviews, setUpcomingInterviews] = useState([]);
+  useEffect(() => {
+    if (!user) return;
+    const now = new Date().toISOString();
+    const in30 = new Date(Date.now() + 30 * 86400_000).toISOString();
+    supabase
+      .from("job_targets")
+      .select("id, job_title, company_name, interview_date")
+      .eq("user_id", user.id)
+      .gte("interview_date", now)
+      .lte("interview_date", in30)
+      .order("interview_date", { ascending: true })
+      .limit(5)
+      .then(({ data }) => setUpcomingInterviews(data || []));
+  }, [user]);
+
   const filteredJobs =
     statusFilter === "all"
       ? jobTargets
@@ -693,6 +709,28 @@ const Dashboard = () => {
         <MetricCard label="Interviews"       value={metrics.interviews}                                           sub="from applications"    color="amber" />
         <MetricCard label="CV versions"      value={metrics.cvVersions}                                           sub="tailored versions"    color="coral" />
       </div>
+
+      {/* Upcoming interviews */}
+      {upcomingInterviews.length > 0 && (
+        <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 mb-6">
+          <p className="text-xs font-bold text-teal-700 uppercase tracking-wide mb-3">Upcoming interviews (next 30 days)</p>
+          <div className="space-y-2">
+            {upcomingInterviews.map((j) => (
+              <div key={j.id} className="flex items-center justify-between gap-4 bg-white rounded-xl px-4 py-2.5 border border-teal-100">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-gray-900 truncate">{j.job_title}</p>
+                  <p className="text-[10px] text-gray-400 truncate">{j.company_name}</p>
+                </div>
+                <p className="text-xs font-semibold text-teal-700 shrink-0">
+                  {new Date(j.interview_date).toLocaleDateString("en-GB", { weekday: "short", month: "short", day: "numeric" })}
+                  {" · "}
+                  {new Date(j.interview_date).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Feature grid */}
       <FeatureGrid plan={plan} overrides={overrides} navigate={navigate} />

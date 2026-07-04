@@ -200,6 +200,8 @@ const JobBoard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [savingId, setSavingId] = useState(null);
+  const [savedSearches, setSavedSearches] = useState([]);
+  const [showSaved, setShowSaved] = useState(false);
 
   const search = useCallback(async () => {
     setIsLoading(true);
@@ -231,6 +233,43 @@ const JobBoard = () => {
   useEffect(() => {
     search();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load saved searches
+  useEffect(() => {
+    if (!user) return;
+    fetch(`${import.meta.env.VITE_API_URL || ""}/api/saved-searches`, {
+      headers: { Authorization: `Bearer ${user.access_token || ""}` },
+    })
+      .then((r) => r.json())
+      .then((d) => setSavedSearches(d.searches || []))
+      .catch(() => {});
+  }, [user]);
+
+  const saveCurrentSearch = async () => {
+    if (!user || !query.trim()) return;
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/saved-searches`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${user.access_token || ""}` },
+        body: JSON.stringify({ query: query.trim(), filters: { category, jobType } }),
+      });
+      const saved = await res.json();
+      if (saved.id) {
+        setSavedSearches((prev) => [saved, ...prev]);
+        toast.success("Search saved");
+      }
+    } catch {
+      toast.error("Failed to save search");
+    }
+  };
+
+  const deleteSavedSearch = async (id) => {
+    setSavedSearches((prev) => prev.filter((s) => s.id !== id));
+    fetch(`${import.meta.env.VITE_API_URL || ""}/api/saved-searches/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${user?.access_token || ""}` },
+    }).catch(() => {});
+  };
 
   const saveToTracker = async (job) => {
     if (!user) return toast.error("Sign in to save jobs.");
@@ -306,7 +345,47 @@ const JobBoard = () => {
           >
             {isLoading ? "Searching…" : "Search"}
           </button>
+          {user && query.trim() && (
+            <button
+              onClick={saveCurrentSearch}
+              title="Save this search"
+              className="p-2.5 rounded-xl border border-gray-200 text-gray-500 hover:text-brand-600 hover:border-brand-300 transition-colors cursor-pointer shrink-0"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+              </svg>
+            </button>
+          )}
+          {savedSearches.length > 0 && (
+            <button
+              onClick={() => setShowSaved((p) => !p)}
+              className="px-3 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-500 hover:text-brand-600 hover:border-brand-300 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+            >
+              Saved ({savedSearches.length})
+            </button>
+          )}
         </div>
+
+        {/* Saved searches panel */}
+        {showSaved && savedSearches.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-2">
+            {savedSearches.map((s) => (
+              <div key={s.id} className="flex items-center gap-1 bg-brand-50 rounded-lg px-2 py-1">
+                <button
+                  onClick={() => { setQuery(s.query); if (s.filters?.category) setCategory(s.filters.category); setShowSaved(false); setTimeout(search, 50); }}
+                  className="text-xs font-medium text-brand-700 cursor-pointer"
+                >
+                  {s.query}
+                </button>
+                <button onClick={() => deleteSavedSearch(s.id)} className="text-brand-400 hover:text-red-500 cursor-pointer ml-1">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Platform search — primary path for all industries */}

@@ -289,6 +289,11 @@ const CandidateDetailView = ({ userId, onBack, onAddToRank }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingSkills, setIsLoadingSkills] = useState(false);
   const [error, setError] = useState(null);
+  const [matchJd, setMatchJd] = useState("");
+  const [matchResult, setMatchResult] = useState(null);
+  const [isMatching, setIsMatching] = useState(false);
+  const [flagging, setFlagging] = useState(false);
+  const [flagged, setFlagged] = useState(false);
 
   useEffect(() => {
     api.get(`/recruiter/candidate/${userId}`)
@@ -296,6 +301,25 @@ const CandidateDetailView = ({ userId, onBack, onAddToRank }) => {
       .catch((e) => setError(e.message))
       .finally(() => setIsLoading(false));
   }, [userId]);
+
+  const handleFlagProfile = async () => {
+    const reason = window.prompt("Reason for flagging this profile (e.g. Fake profile, Inappropriate content):");
+    if (!reason?.trim()) return;
+    setFlagging(true);
+    try {
+      await api.post("/recruiter/flag-candidate", { candidateId: userId, reason: reason.trim() });
+      setFlagged(true);
+    } catch (e) { alert(e.message); } finally { setFlagging(false); }
+  };
+
+  const handleMatchJd = async () => {
+    if (!matchJd.trim()) return;
+    setIsMatching(true);
+    try {
+      const r = await api.post("/recruiter/match-jd", { userId, jobDescription: matchJd });
+      setMatchResult(r);
+    } catch (e) { console.error(e); } finally { setIsMatching(false); }
+  };
 
   const loadSkills = async () => {
     setIsLoadingSkills(true);
@@ -335,12 +359,21 @@ const CandidateDetailView = ({ userId, onBack, onAddToRank }) => {
           <span className="text-gray-200">·</span>
           <h2 className="text-base font-bold text-gray-900">{profile.name}</h2>
         </div>
-        <button
-          onClick={() => onAddToRank(userId, profile.name)}
-          className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-semibold cursor-pointer transition-colors"
-        >
-          + Add to ranking
-        </button>
+        <div className="flex items-center gap-2">
+          {flagged ? (
+            <span className="text-[10px] text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 font-semibold">Flagged for review</span>
+          ) : (
+            <button onClick={handleFlagProfile} disabled={flagging}
+              className="text-xs px-3 py-1.5 border border-gray-200 text-gray-500 rounded-lg hover:border-red-300 hover:text-red-500 font-medium cursor-pointer transition-colors disabled:opacity-50"
+            >{flagging ? "Flagging…" : "Flag profile"}</button>
+          )}
+          <button
+            onClick={() => onAddToRank(userId, profile.name)}
+            className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-semibold cursor-pointer transition-colors"
+          >
+            + Add to ranking
+          </button>
+        </div>
       </div>
 
       {/* Profile + stats */}
@@ -461,6 +494,58 @@ const CandidateDetailView = ({ userId, onBack, onAddToRank }) => {
         </div>
       )}
 
+      {/* Match against JD */}
+      {cv && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Match against job description</p>
+          {!matchResult ? (
+            <div className="space-y-3">
+              <textarea
+                value={matchJd}
+                onChange={(e) => setMatchJd(e.target.value)}
+                placeholder="Paste a job description to score this candidate…"
+                rows={5}
+                className="w-full px-3 py-2.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-600 resize-none placeholder:text-gray-300"
+              />
+              <button onClick={handleMatchJd} disabled={isMatching || !matchJd.trim()}
+                className="px-4 py-2 bg-brand-600 text-white text-xs font-semibold rounded-xl cursor-pointer hover:bg-brand-700 disabled:opacity-50 transition-colors"
+              >{isMatching ? "Scoring…" : "Calculate match score"}</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-4">
+                <span className={`text-4xl font-bold ${matchResult.score >= 70 ? "text-teal-600" : matchResult.score >= 50 ? "text-amber-600" : "text-coral-500"}`}>
+                  {matchResult.score}
+                </span>
+                <div className="flex-1">
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-brand-500 rounded-full" style={{ width: `${matchResult.score}%` }} />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{matchResult.verdict || "Match scored"}</p>
+                </div>
+              </div>
+              {matchResult.matching_skills?.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-teal-600 font-bold uppercase tracking-wide mb-1.5">Matching skills</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {matchResult.matching_skills.map((s) => <span key={s} className="text-[10px] px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full">{s}</span>)}
+                  </div>
+                </div>
+              )}
+              {matchResult.missing_skills?.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-coral-500 font-bold uppercase tracking-wide mb-1.5">Missing skills</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {matchResult.missing_skills.map((s) => <span key={s} className="text-[10px] px-2 py-0.5 bg-coral-50 text-coral-600 rounded-full">{s}</span>)}
+                  </div>
+                </div>
+              )}
+              <button onClick={() => setMatchResult(null)} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Try another JD</button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* CV excerpt */}
       {cv?.rawText && (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
@@ -470,6 +555,247 @@ const CandidateDetailView = ({ userId, onBack, onAddToRank }) => {
           </pre>
         </div>
       )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+//  VIEW: Shortlists
+// ─────────────────────────────────────────────────────────────
+const ShortlistsView = ({ selectedForRank, selectedNames }) => {
+  const [shortlists, setShortlists] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [activeList, setActiveList] = useState(null);
+  const [listCandidates, setListCandidates] = useState([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [adding, setAdding] = useState(false);
+
+  const load = () => {
+    api.get("/shortlists").then((d) => setShortlists(d.shortlists || [])).catch(() => {}).finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  const create = async () => {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const sl = await api.post("/shortlists", { name: newName.trim() });
+      setShortlists((p) => [sl, ...p]);
+      setNewName("");
+    } catch (e) { alert(e.message); } finally { setCreating(false); }
+  };
+
+  const removeList = async (id) => {
+    await api.delete(`/shortlists/${id}`).catch(() => {});
+    setShortlists((p) => p.filter((s) => s.id !== id));
+    if (activeList?.id === id) { setActiveList(null); setListCandidates([]); }
+  };
+
+  const openList = async (sl) => {
+    if (activeList?.id === sl.id) { setActiveList(null); setListCandidates([]); return; }
+    setActiveList(sl);
+    setLoadingCandidates(true);
+    try {
+      const d = await api.get(`/shortlists/${sl.id}/candidates`);
+      setListCandidates(d.candidates || []);
+    } catch { setListCandidates([]); } finally { setLoadingCandidates(false); }
+  };
+
+  const removeFromList = async (candidateId) => {
+    await api.delete(`/shortlists/${activeList.id}/candidates/${candidateId}`).catch(() => {});
+    setListCandidates((p) => p.filter((c) => c.candidate_id !== candidateId));
+    setShortlists((p) => p.map((s) => s.id === activeList.id
+      ? { ...s, candidates: [{ count: Math.max(0, (s.candidates?.[0]?.count || 1) - 1) }] }
+      : s));
+  };
+
+  const addSelected = async (slId) => {
+    const ids = [...selectedForRank];
+    if (!ids.length) { alert("No candidates selected. Go to Candidates tab and select first."); return; }
+    setAdding(true);
+    try {
+      await Promise.all(ids.map((id) => api.post(`/shortlists/${slId}/candidates`, { candidateId: id })));
+      load();
+    } catch (e) { alert(e.message); } finally { setAdding(false); }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-base font-bold text-gray-900">Shortlists</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Organise candidates into named shortlists for easy reference</p>
+      </div>
+
+      <div className="flex gap-2">
+        <input value={newName} onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && create()}
+          placeholder="New shortlist name…"
+          className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-600"
+        />
+        <button onClick={create} disabled={creating || !newName.trim()}
+          className="px-4 py-2 bg-brand-600 text-white text-sm font-semibold rounded-xl cursor-pointer hover:bg-brand-800 disabled:opacity-50"
+        >{creating ? "Creating…" : "Create"}</button>
+      </div>
+
+      {selectedForRank.size > 0 && shortlists.length > 0 && (
+        <div className="bg-brand-50 border border-brand-100 rounded-xl p-3 flex items-center gap-3 flex-wrap">
+          <p className="text-xs text-brand-700 font-medium">{selectedForRank.size} selected — add to:</p>
+          {shortlists.map((sl) => (
+            <button key={sl.id} onClick={() => addSelected(sl.id)} disabled={adding}
+              className="text-xs px-3 py-1.5 bg-brand-600 text-white rounded-lg font-semibold cursor-pointer hover:bg-brand-700 disabled:opacity-50"
+            >"{sl.name}"</button>
+          ))}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Spinner size="lg" /></div>
+      ) : shortlists.length === 0 ? (
+        <div className="text-center py-12 text-sm text-gray-300">No shortlists yet. Create one above.</div>
+      ) : (
+        <div className="space-y-3">
+          {shortlists.map((sl) => (
+            <div key={sl.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between gap-4 px-4 py-3 cursor-pointer hover:bg-gray-50" onClick={() => openList(sl)}>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{sl.name}</p>
+                  <p className="text-xs text-gray-400">{sl.candidates?.[0]?.count || 0} candidates · {new Date(sl.created_at).toLocaleDateString()}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={(e) => { e.stopPropagation(); removeList(sl.id); }}
+                    className="text-xs text-red-400 hover:text-red-600 cursor-pointer">Delete</button>
+                  <span className="text-gray-300 text-xs">{activeList?.id === sl.id ? "▲" : "▼"}</span>
+                </div>
+              </div>
+              {activeList?.id === sl.id && (
+                <div className="border-t border-gray-100 px-4 py-3">
+                  {loadingCandidates ? (
+                    <div className="flex justify-center py-4"><Spinner size="sm" /></div>
+                  ) : listCandidates.length === 0 ? (
+                    <p className="text-xs text-gray-300 text-center py-4">No candidates in this shortlist yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {listCandidates.map((c) => (
+                        <div key={c.candidate_id} className="flex items-center justify-between gap-3 py-1.5">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{c.candidate?.full_name || "Unknown"}</p>
+                            <p className="text-xs text-gray-400">{c.candidate?.email}</p>
+                          </div>
+                          <button onClick={() => removeFromList(c.candidate_id)}
+                            className="text-xs text-red-400 hover:text-red-600 cursor-pointer">Remove</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+//  VIEW: Bulk Outreach
+// ─────────────────────────────────────────────────────────────
+const BulkOutreachView = ({ selectedForRank, selectedNames }) => {
+  const [mode, setMode] = useState("selected");
+  const [manualIds, setManualIds] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  const candidateIds = mode === "selected" ? [...selectedForRank] : manualIds.split(/[\s,]+/).filter(Boolean);
+
+  const handleSend = async () => {
+    if (!candidateIds.length) { setError("No candidates selected."); return; }
+    if (!subject.trim() || !message.trim()) { setError("Subject and message are required."); return; }
+    setError(null);
+    setSending(true);
+    try {
+      const data = await api.post("/recruiter/bulk-outreach", {
+        candidateIds,
+        subject: subject.trim(),
+        message: message.trim(),
+      });
+      setResult(data);
+    } catch (e) { setError(e.message); } finally { setSending(false); }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-base font-bold text-gray-900">Bulk outreach</h2>
+        <p className="text-xs text-gray-400 mt-0.5">
+          Send personalised emails to multiple candidates. Use <code className="bg-gray-100 px-1 rounded text-[10px]">{"{{name}}"}</code> or <code className="bg-gray-100 px-1 rounded text-[10px]">{"{{first_name}}"}</code> as placeholders.
+        </p>
+      </div>
+
+      <div className="flex gap-2">
+        {[["selected", `From selection (${selectedForRank.size})`], ["manual", "Manual IDs"]].map(([m, label]) => (
+          <button key={m} onClick={() => setMode(m)}
+            className={`px-4 py-1.5 text-xs font-semibold rounded-full cursor-pointer transition-colors ${mode === m ? "bg-brand-600 text-white" : "bg-white border border-gray-200 text-gray-500 hover:border-brand-300"}`}
+          >{label}</button>
+        ))}
+      </div>
+
+      {mode === "selected" && selectedForRank.size > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {Object.values(selectedNames).map((n, i) => (
+            <span key={i} className="text-xs px-2.5 py-1 bg-brand-50 text-brand-700 rounded-full border border-brand-100">{n}</span>
+          ))}
+        </div>
+      )}
+      {mode === "selected" && selectedForRank.size === 0 && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">No candidates selected. Go to Candidates and check some first.</p>
+      )}
+      {mode === "manual" && (
+        <textarea value={manualIds} onChange={(e) => setManualIds(e.target.value)}
+          placeholder="Paste candidate user IDs — one per line or comma-separated…"
+          rows={4}
+          className="w-full px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-600 resize-none"
+        />
+      )}
+
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1.5">Subject</label>
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="We'd love to speak with you"
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-600"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1.5">Message</label>
+          <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={8}
+            placeholder={`Hi {{first_name}},\n\nI came across your profile on Seevv and I think you'd be a great fit…`}
+            className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-600 resize-none"
+          />
+        </div>
+      </div>
+
+      {result ? (
+        <div className={`rounded-xl border p-4 ${result.failed > 0 ? "bg-amber-50 border-amber-200" : "bg-teal-50 border-teal-200"}`}>
+          <p className={`text-sm font-semibold ${result.failed > 0 ? "text-amber-800" : "text-teal-800"}`}>
+            ✓ Sent {result.sent} · {result.failed} failed
+          </p>
+          {result.errors?.length > 0 && (
+            <ul className="mt-2 space-y-1">{result.errors.map((e, i) => <li key={i} className="text-xs text-amber-700">{e}</li>)}</ul>
+          )}
+          <button onClick={() => setResult(null)} className="mt-3 text-xs text-gray-500 hover:text-gray-700 cursor-pointer">Send another</button>
+        </div>
+      ) : (
+        <button onClick={handleSend} disabled={sending || !candidateIds.length || !subject.trim() || !message.trim()}
+          className="w-full py-3 bg-brand-600 text-white rounded-xl font-semibold text-sm hover:bg-brand-700 disabled:opacity-50 cursor-pointer transition-colors"
+        >{sending ? `Sending to ${candidateIds.length}…` : `Send to ${candidateIds.length} candidate${candidateIds.length !== 1 ? "s" : ""}`}</button>
+      )}
+
+      {error && <p className="text-sm text-coral-700 bg-coral-50 border border-coral-200 rounded-xl px-3 py-2">{error}</p>}
     </div>
   );
 };
@@ -734,6 +1060,8 @@ const RecruiterPortal = () => {
   const tabs = [
     { id: "overview", label: "Overview" },
     { id: "candidates", label: "Candidates" },
+    { id: "shortlists", label: "Shortlists" },
+    { id: "outreach", label: "Outreach" },
     { id: "rank", label: `Rank${selectedForRank.size > 0 ? ` (${selectedForRank.size})` : ""}` },
   ];
 
@@ -805,6 +1133,17 @@ const RecruiterPortal = () => {
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               )}
+              {tab.id === "shortlists" && (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+              )}
+              {tab.id === "outreach" && (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+              )}
               {tab.id === "rank" && (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -857,6 +1196,12 @@ const RecruiterPortal = () => {
                   onSelectForRank={toggleSelectForRank}
                   selectedForRank={selectedForRank}
                 />
+              )}
+              {activeTab === "shortlists" && (
+                <ShortlistsView selectedForRank={selectedForRank} selectedNames={selectedNames} />
+              )}
+              {activeTab === "outreach" && (
+                <BulkOutreachView selectedForRank={selectedForRank} selectedNames={selectedNames} />
               )}
               {activeTab === "rank" && (
                 <RankToolView

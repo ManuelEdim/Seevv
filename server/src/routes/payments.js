@@ -1,24 +1,12 @@
 import express from "express";
 import { supabase } from "../lib/supabase.js";
 import auth from "../middleware/auth.js";
+import { getPaymentProvider, isPaymentEnabled } from "../lib/paymentProvider.js";
 
 const router = express.Router();
 router.use(auth);
 
-const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
-const PAYSTACK_BASE = "https://api.paystack.co";
-
-const paystackFetch = (path, options = {}) =>
-  fetch(`${PAYSTACK_BASE}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${PAYSTACK_SECRET}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  }).then((r) => r.json());
-
-// Plan definitions — amounts in smallest unit (kobo for NGN, cents for USD/GBP)
+// Plan definitions — amounts in smallest currency unit (kobo/cents/pence)
 const PLANS = {
   starter_ngn:  { amount: 400000,  currency: "NGN", name: "Starter Plan", plan: "starter" },
   starter_usd:  { amount: 900,     currency: "USD", name: "Starter Plan", plan: "starter" },
@@ -32,16 +20,17 @@ const PLANS = {
 };
 
 // POST /api/payments/initialize
-// Initialize a Paystack transaction and return the hosted payment URL
 router.post("/initialize", async (req, res) => {
-  const { planKey } = req.body;
+  const { planKey, callbackUrl, cancelUrl } = req.body;
   const userId = req.user.id;
 
   const plan = PLANS[planKey];
   if (!plan) return res.status(400).json({ error: "Invalid plan key" });
-  if (!PAYSTACK_SECRET) return res.status(500).json({ error: "Payment gateway not configured" });
 
   try {
+    const enabled = await isPaymentEnabled();
+    if (!enabled) return res.status(503).json({ error: "Payments are currently disabled." });
+
     const { data: profile, error: profileErr } = await supabase
       .from("profiles")
       .select("email, full_name")
@@ -51,9 +40,11 @@ router.post("/initialize", async (req, res) => {
     if (profileErr || !profile) return res.status(404).json({ error: "User profile not found" });
 
     const reference = `seevv_${userId.slice(0, 8)}_${Date.now()}`;
+    const provider = await getPaymentProvider();
 
-    const payload = {
+    const result = await provider.initialize({
       email: profile.email,
+      name: profile.full_name || "",
       amount: plan.amount,
       currency: plan.currency,
       reference,
@@ -63,22 +54,11 @@ router.post("/initialize", async (req, res) => {
         plan_name: plan.name,
         full_name: profile.full_name || "",
       },
-    };
-
-    const result = await paystackFetch("/transaction/initialize", {
-      method: "POST",
-      body: JSON.stringify(payload),
+      callbackUrl: callbackUrl || `${process.env.FRONTEND_URL || "http://localhost:5173"}/pricing`,
+      cancelUrl: cancelUrl || `${process.env.FRONTEND_URL || "http://localhost:5173"}/pricing`,
     });
 
-    if (!result.status) {
-      return res.status(502).json({ error: result.message || "Failed to initialize payment" });
-    }
-
-    res.json({
-      authorization_url: result.data.authorization_url,
-      access_code: result.data.access_code,
-      reference: result.data.reference,
-    });
+    res.json(result);
   } catch (err) {
     console.error("Payment initialize error:", err);
     res.status(500).json({ error: err.message });
@@ -86,23 +66,19 @@ router.post("/initialize", async (req, res) => {
 });
 
 // GET /api/payments/verify/:reference
-// Verify a completed Paystack transaction and upgrade the user's plan
 router.get("/verify/:reference", async (req, res) => {
   const { reference } = req.params;
   const userId = req.user.id;
 
-  if (!PAYSTACK_SECRET) return res.status(500).json({ error: "Payment gateway not configured" });
-
   try {
-    const result = await paystackFetch(`/transaction/verify/${reference}`);
+    const enabled = await isPaymentEnabled();
+    if (!enabled) return res.status(503).json({ error: "Payments are currently disabled." });
 
-    if (!result.status || result.data?.status !== "success") {
-      return res.status(402).json({ error: "Payment not successful", detail: result.data?.gateway_response });
-    }
+    const provider = await getPaymentProvider();
+    const result = await provider.verify(reference);
 
-    const meta = result.data.metadata || {};
-
-    // Guard: only update if the reference belongs to this user
+    // Guard: only upgrade if the metadata user_id matches the authed user
+    const meta = result.metadata || {};
     if (meta.user_id && meta.user_id !== userId) {
       return res.status(403).json({ error: "Reference does not belong to this account" });
     }
@@ -110,7 +86,6 @@ router.get("/verify/:reference", async (req, res) => {
     const planKey = meta.plan_key || "";
     const planName = PLANS[planKey]?.plan || "pro";
 
-    // Upgrade the user's plan in Supabase
     const { error: updateErr } = await supabase
       .from("profiles")
       .update({
@@ -128,9 +103,9 @@ router.get("/verify/:reference", async (req, res) => {
     res.json({
       success: true,
       plan: planName,
-      amount: result.data.amount,
-      currency: result.data.currency,
-      paid_at: result.data.paid_at,
+      amount: result.amount,
+      currency: result.currency,
+      paid_at: result.paid_at,
     });
   } catch (err) {
     console.error("Payment verify error:", err);

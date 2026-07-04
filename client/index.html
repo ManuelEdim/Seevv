@@ -9,11 +9,19 @@
       name="description"
       content="Seevv — AI-powered CV tailoring and career intelligence platform"
     />
-    <meta name="theme-color" content="#534AB7" />
+    <meta name="theme-color" content="#033876" />
+    <link rel="manifest" href="/manifest.json" />
     <title>Seevv</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js").catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>

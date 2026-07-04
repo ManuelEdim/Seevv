@@ -307,9 +307,185 @@ const ApiAccessPage = () => {
   );
 };
 
+// ─── Webhooks section ─────────────────────────────────────
+const WEBHOOK_EVENTS = [
+  "cv.updated", "cv_version.created", "job.applied",
+  "job.status_changed", "interview.scheduled",
+  "verification.approved", "verification.rejected",
+];
+
+const WebhooksSection = () => {
+  const [webhooks, setWebhooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [newUrl, setNewUrl] = useState("");
+  const [newEvents, setNewEvents] = useState(["cv_version.created"]);
+  const [showForm, setShowForm] = useState(false);
+  const [testingId, setTestingId] = useState(null);
+  const [testResult, setTestResult] = useState(null);
+
+  const load = () => {
+    api.get("/webhooks").then((d) => setWebhooks(d.webhooks || [])).catch(() => {}).finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  const create = async () => {
+    if (!newUrl.trim() || !newEvents.length) return;
+    setCreating(true);
+    try {
+      const created = await api.post("/webhooks", { url: newUrl.trim(), events: newEvents });
+      setWebhooks((prev) => [created, ...prev]);
+      setNewUrl(""); setNewEvents(["cv_version.created"]); setShowForm(false);
+    } catch (err) { alert(err.message); } finally { setCreating(false); }
+  };
+
+  const remove = async (id) => {
+    await api.delete(`/webhooks/${id}`).catch(() => {});
+    setWebhooks((prev) => prev.filter((w) => w.id !== id));
+  };
+
+  const test = async (id) => {
+    setTestingId(id);
+    try {
+      const r = await api.post(`/webhooks/${id}/test`);
+      setTestResult({ id, ok: r.success, status: r.statusCode });
+    } catch { setTestResult({ id, ok: false }); } finally { setTestingId(null); }
+    setTimeout(() => setTestResult(null), 5000);
+  };
+
+  const toggleEvent = (e) => setNewEvents((prev) => prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]);
+
+  return (
+    <Card padding="md">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-gray-900">Webhooks</p>
+            <p className="text-xs text-gray-400 mt-0.5">Get notified in real-time when events happen in your Seevv account</p>
+          </div>
+          <button onClick={() => setShowForm((p) => !p)} className="text-xs font-semibold text-brand-600 hover:text-brand-800 cursor-pointer">
+            {showForm ? "Cancel" : "+ Add webhook"}
+          </button>
+        </div>
+
+        {showForm && (
+          <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+            <input
+              value={newUrl}
+              onChange={(e) => setNewUrl(e.target.value)}
+              placeholder="https://your-server.com/webhook"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-600"
+            />
+            <div className="flex flex-wrap gap-2">
+              {WEBHOOK_EVENTS.map((e) => (
+                <button key={e} onClick={() => toggleEvent(e)}
+                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border cursor-pointer transition-colors ${newEvents.includes(e) ? "bg-brand-600 text-white border-brand-600" : "bg-white text-gray-500 border-gray-200 hover:border-brand-300"}`}
+                >{e}</button>
+              ))}
+            </div>
+            <button onClick={create} disabled={creating || !newUrl.trim() || !newEvents.length}
+              className="px-4 py-2 bg-brand-600 text-white text-xs font-semibold rounded-xl cursor-pointer hover:bg-brand-800 disabled:opacity-50"
+            >{creating ? "Creating…" : "Create webhook"}</button>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-xs text-gray-400 py-4 text-center">Loading webhooks…</p>
+        ) : webhooks.length === 0 ? (
+          <p className="text-xs text-gray-400 py-4 text-center">No webhooks configured yet</p>
+        ) : (
+          <div className="space-y-3">
+            {webhooks.map((w) => (
+              <div key={w.id} className="flex items-start gap-4 p-3 bg-gray-50 rounded-xl">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-900 truncate">{w.url}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5 flex flex-wrap gap-1">
+                    {(w.events || []).map((e) => <span key={e} className="bg-brand-50 text-brand-700 px-1.5 py-0.5 rounded">{e}</span>)}
+                  </p>
+                  {testResult?.id === w.id && (
+                    <p className={`text-[10px] mt-1 font-semibold ${testResult.ok ? "text-teal-600" : "text-red-500"}`}>
+                      {testResult.ok ? `✓ Test delivered (HTTP ${testResult.status})` : "✗ Delivery failed"}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button onClick={() => test(w.id)} disabled={testingId === w.id}
+                    className="text-[10px] text-gray-500 hover:text-brand-600 cursor-pointer font-medium disabled:opacity-50"
+                  >{testingId === w.id ? "Testing…" : "Test"}</button>
+                  <button onClick={() => remove(w.id)} className="text-[10px] text-red-400 hover:text-red-600 cursor-pointer">Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+};
+
+// ─── CV share section ─────────────────────────────────────
+const CvShareSection = () => {
+  const [shares, setShares] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get("/cv-review/my").then((d) => setShares(d.shares || [])).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const revoke = async (id) => {
+    await api.delete(`/cv-review/${id}`).catch(() => {});
+    setShares((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  return (
+    <Card padding="md">
+      <div className="space-y-4">
+        <div>
+          <p className="text-sm font-bold text-gray-900">CV Share Links</p>
+          <p className="text-xs text-gray-400 mt-0.5">Public review links for your CVs — manage from your CV Manager</p>
+        </div>
+        {loading ? (
+          <p className="text-xs text-gray-400 py-4 text-center">Loading shares…</p>
+        ) : shares.length === 0 ? (
+          <p className="text-xs text-gray-400 py-4 text-center">No active share links. Create one from CV Manager.</p>
+        ) : (
+          <div className="space-y-3">
+            {shares.map((s) => (
+              <div key={s.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-900 truncate">{s.title}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    {s.view_count || 0} views · {(s.comments?.[0]?.count ?? s.comments?.length ?? 0)} comments
+                    {s.expires_at && ` · expires ${new Date(s.expires_at).toLocaleDateString()}`}
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/review/${s.token}`); }}
+                    className="text-[10px] text-brand-600 hover:text-brand-800 cursor-pointer font-medium"
+                  >Copy link</button>
+                  <button onClick={() => revoke(s.id)} className="text-[10px] text-red-400 hover:text-red-600 cursor-pointer">Revoke</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+};
+
+const ApiAccessInner = () => (
+  <div className="space-y-6 pb-10">
+    <ApiAccessPage />
+    <WebhooksSection />
+    <CvShareSection />
+  </div>
+);
+
 const ApiAccessGated = () => (
   <FeatureGate feature="api_access">
-    <ApiAccessPage />
+    <ApiAccessInner />
   </FeatureGate>
 );
 export default ApiAccessGated;

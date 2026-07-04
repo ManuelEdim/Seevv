@@ -1,29 +1,11 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getProvider } from "./aiProvider.js";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-const MODELS = {
-  flash: "gemini-2.5-flash",
-  pro: "gemini-2.5-flash",
-};
-
 const generateContent = async (prompt, modelTier = "flash", options = {}) => {
-  const modelName = MODELS[modelTier] || MODELS.flash;
-  const model = genAI.getGenerativeModel({
-    model: modelName,
-    generationConfig: {
-      temperature: options.temperature ?? 0.7,
-      maxOutputTokens: options.maxTokens ?? 4096,
-      responseMimeType: options.json ? "application/json" : "text/plain",
-    },
-  });
-
-  const result = await model.generateContent(prompt);
-  const response = result.response;
-  const text = response.text();
+  const provider = await getProvider();
+  const text = await provider.generate(prompt, modelTier, options);
 
   if (options.json) {
     try {

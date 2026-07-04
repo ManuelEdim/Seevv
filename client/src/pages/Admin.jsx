@@ -456,12 +456,27 @@ const BADGE_LABELS = {
 };
 
 const VerificationRequests = ({ requests, onApprove, onReject, loading }) => {
-  const [actioning, setActioning] = useState(null);
+  const [actioning, setActioning]         = useState(null);
+  const [rejectingId, setRejectingId]     = useState(null);
+  const [rejectReason, setRejectReason]   = useState("");
 
-  const act = async (fn, id) => {
+  const handleApprove = async (id) => {
     setActioning(id);
-    await fn(id);
+    await onApprove(id);
     setActioning(null);
+  };
+
+  const handleRejectClick = (id) => {
+    setRejectingId(id);
+    setRejectReason("");
+  };
+
+  const handleRejectConfirm = async (id) => {
+    setActioning(id);
+    await onReject(id, rejectReason.trim());
+    setActioning(null);
+    setRejectingId(null);
+    setRejectReason("");
   };
 
   if (loading) return <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" /></div>;
@@ -479,30 +494,64 @@ const VerificationRequests = ({ requests, onApprove, onReject, loading }) => {
   return (
     <div className="space-y-3">
       {requests.map((req) => (
-        <div key={req.id} className="flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-gray-900">{req.profile?.full_name || "Unknown user"}</p>
-            <p className="text-xs text-gray-400 truncate">{req.profile?.email}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full border border-amber-100">{BADGE_LABELS[req.badge_type] || req.badge_type}</span>
-              <span className="text-[10px] text-gray-400">{new Date(req.requested_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+        <div key={req.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-4 p-4">
+            <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-gray-900">{req.profile?.full_name || "Unknown user"}</p>
+              <p className="text-xs text-gray-400 truncate">{req.profile?.email}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full border border-amber-100">{BADGE_LABELS[req.badge_type] || req.badge_type}</span>
+                <span className="text-[10px] text-gray-400">{new Date(req.requested_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+              </div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button onClick={() => handleApprove(req.id)} disabled={actioning === req.id || rejectingId === req.id}
+                className="text-xs font-semibold px-3 py-1.5 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors cursor-pointer disabled:opacity-50">
+                {actioning === req.id ? "…" : "Approve"}
+              </button>
+              {rejectingId === req.id ? (
+                <button onClick={() => { setRejectingId(null); setRejectReason(""); }}
+                  className="text-xs font-semibold px-3 py-1.5 border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                  Cancel
+                </button>
+              ) : (
+                <button onClick={() => handleRejectClick(req.id)} disabled={actioning === req.id}
+                  className="text-xs font-semibold px-3 py-1.5 border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50">
+                  Reject
+                </button>
+              )}
             </div>
           </div>
-          <div className="flex gap-2 shrink-0">
-            <button onClick={() => act(onApprove, req.id)} disabled={actioning === req.id}
-              className="text-xs font-semibold px-3 py-1.5 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors cursor-pointer disabled:opacity-50">
-              {actioning === req.id ? "…" : "Approve"}
-            </button>
-            <button onClick={() => act(onReject, req.id)} disabled={actioning === req.id}
-              className="text-xs font-semibold px-3 py-1.5 border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50">
-              Reject
-            </button>
-          </div>
+
+          {/* Rejection reason form — slides in below */}
+          {rejectingId === req.id && (
+            <div className="border-t border-red-50 bg-red-50/40 px-4 py-3 flex items-end gap-2">
+              <div className="flex-1">
+                <p className="text-[11px] font-semibold text-red-700 mb-1">Reason (optional — sent to user)</p>
+                <input
+                  autoFocus
+                  type="text"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="e.g. Documentation unclear or expired"
+                  className="w-full text-xs border border-red-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-red-300/40"
+                  onKeyDown={(e) => e.key === "Enter" && handleRejectConfirm(req.id)}
+                />
+              </div>
+              <button
+                onClick={() => handleRejectConfirm(req.id)}
+                disabled={actioning === req.id}
+                className="text-xs font-semibold px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                {actioning === req.id ? "…" : "Confirm reject"}
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -536,6 +585,1001 @@ const NotifToast = ({ notif, onDismiss, onView }) => {
           <button onClick={onView} className="text-xs font-semibold text-brand-700 hover:text-brand-900 cursor-pointer">Review →</button>
           <button onClick={onDismiss} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Dismiss</button>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── AI Settings panel ────────────────────────────────────
+const AISettingsPanel = () => {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const loadSettings = async () => {
+    try {
+      const data = await api.get("/admin/ai-settings");
+      setSettings(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadSettings(); }, []);
+
+  const handleToggle = async () => {
+    setSaving(true);
+    try {
+      const data = await api.put("/admin/ai-settings", { enabled: !settings.enabled });
+      setSettings(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleProviderChange = async (provider) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const data = await api.put("/admin/ai-settings", { provider });
+      setSettings(data);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveProviderKey = async (provider, key) => {
+    setError(null);
+    const result = await api.put("/admin/ai-settings/key", { provider, key });
+    setSettings((prev) => ({
+      ...prev,
+      providers: {
+        ...prev.providers,
+        [provider]: { ...prev.providers[provider], configured: true, keyPreview: result.keyPreview },
+      },
+    }));
+  };
+
+  if (loading) return <div className="flex justify-center py-16"><img src="/favicon.png" alt="Loading" className="w-10 h-10 animate-pulse" /></div>;
+
+  const providers = settings?.providers || {};
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <p className="text-xs text-red-700">{error}</p>
+          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600 cursor-pointer text-sm">✕</button>
+        </div>
+      )}
+
+      {/* Master toggle */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-gray-900">AI Features</p>
+            <p className="text-xs text-gray-400 mt-0.5">Toggle all AI-powered features on or off across the platform</p>
+          </div>
+          <button
+            onClick={handleToggle}
+            disabled={saving}
+            className={`relative w-12 h-6 rounded-full transition-colors cursor-pointer ${settings?.enabled ? "bg-teal-500" : "bg-gray-300"}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${settings?.enabled ? "translate-x-6" : ""}`} />
+          </button>
+        </div>
+        {!settings?.enabled && (
+          <div className="mt-3 bg-amber-50 border border-amber-100 rounded-xl p-3">
+            <p className="text-xs text-amber-800">AI is currently <span className="font-bold">disabled</span>. All AI-powered features will return a 503 error until re-enabled.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Provider selection */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p className="text-sm font-bold text-gray-900 mb-1">Active AI Provider</p>
+        <p className="text-xs text-gray-400 mb-4">Paste each provider's API key below, then click a card to set it as active.</p>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          {Object.entries(providers).map(([id, info]) => (
+            <AIProviderCard
+              key={id}
+              id={id}
+              info={info}
+              isActive={settings?.activeProvider === id}
+              onActivate={handleProviderChange}
+              onSaveKey={saveProviderKey}
+              saving={saving}
+            />
+          ))}
+        </div>
+        <div className="mt-4 pt-4 border-t border-gray-50 grid sm:grid-cols-2 gap-3 text-[11px] text-gray-400">
+          <div><span className="font-medium text-gray-500">Gemini</span> — aistudio.google.com → Get API Key</div>
+          <div><span className="font-medium text-gray-500">OpenAI</span> — platform.openai.com → API Keys</div>
+          <div><span className="font-medium text-gray-500">Anthropic</span> — console.anthropic.com → API Keys</div>
+          <div><span className="font-medium text-gray-500">Mistral</span> — console.mistral.ai → API Keys</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── AI provider card (mirrors GatewayCard but shows models) ─
+const AIProviderCard = ({ id, info, isActive, onActivate, onSaveKey, saving }) => {
+  const [keyInput, setKeyInput]       = useState("");
+  const [showKeyForm, setShowKeyForm] = useState(!info.keyPreview);
+  const [keySaving, setKeySaving]     = useState(false);
+
+  const handleSave = async (e) => {
+    e.stopPropagation();
+    if (!keyInput.trim()) return;
+    setKeySaving(true);
+    try {
+      await onSaveKey(id, keyInput.trim());
+      setKeyInput("");
+      setShowKeyForm(false);
+    } finally {
+      setKeySaving(false);
+    }
+  };
+
+  return (
+    <div className={`rounded-xl border-2 transition-all ${
+      isActive ? "border-teal-400 bg-teal-50" : info.configured ? "border-gray-100 bg-white" : "border-dashed border-gray-200 bg-gray-50"
+    }`}>
+      <button
+        onClick={() => info.configured && !isActive && onActivate(id)}
+        disabled={saving || !info.configured || isActive}
+        className={`text-left p-4 w-full rounded-t-xl ${isActive ? "" : info.configured ? "cursor-pointer hover:bg-gray-50/50" : "cursor-default"}`}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-semibold text-gray-900">{info.label}</p>
+          <div className="flex items-center gap-1.5">
+            {isActive && <span className="px-2 py-0.5 rounded-full bg-teal-500 text-white text-[10px] font-bold">ACTIVE</span>}
+            <span className={`w-2 h-2 rounded-full ${info.configured ? "bg-teal-500" : "bg-gray-300"}`} />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 w-8">Fast</span>
+            <span className="text-[11px] text-gray-500 font-mono">{info.models?.flash}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 w-8">Pro</span>
+            <span className="text-[11px] text-gray-500 font-mono">{info.models?.pro}</span>
+          </div>
+        </div>
+      </button>
+
+      <div className="px-4 pb-4 pt-2 border-t border-gray-100">
+        {info.keyPreview && !showKeyForm ? (
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-teal-600 font-mono font-medium">Key: {info.keyPreview}</span>
+            <button onClick={() => setShowKeyForm(true)} className="text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer">Update</button>
+          </div>
+        ) : (
+          <div className="flex gap-1.5">
+            <input
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder="Paste API key…"
+              className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-teal-400"
+            />
+            <button
+              onClick={handleSave}
+              disabled={!keyInput.trim() || keySaving}
+              className="px-3 py-1.5 rounded-lg bg-teal-500 text-white text-xs font-medium cursor-pointer disabled:opacity-40"
+            >
+              {keySaving ? "…" : "Save"}
+            </button>
+            {info.keyPreview && (
+              <button onClick={() => { setShowKeyForm(false); setKeyInput(""); }} className="px-2 py-1.5 text-xs text-gray-400 cursor-pointer">✕</button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Shared toggle + status atoms ─────────────────────────
+const Toggle = ({ on, onClick, disabled }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={`relative w-12 h-6 rounded-full transition-colors cursor-pointer ${on ? "bg-teal-500" : "bg-gray-300"} disabled:opacity-50`}
+  >
+    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-6" : ""}`} />
+  </button>
+);
+
+const GatewayCard = ({ id, info, isActive, onActivate, onSaveKey, saving }) => {
+  const [keyInput, setKeyInput]       = useState("");
+  const [showKeyForm, setShowKeyForm] = useState(!info.keyPreview);
+  const [keySaving, setKeySaving]     = useState(false);
+
+  const handleSave = async (e) => {
+    e.stopPropagation();
+    if (!keyInput.trim()) return;
+    setKeySaving(true);
+    try {
+      await onSaveKey(id, keyInput.trim());
+      setKeyInput("");
+      setShowKeyForm(false);
+    } finally {
+      setKeySaving(false);
+    }
+  };
+
+  return (
+    <div className={`rounded-xl border-2 transition-all ${
+      isActive ? "border-teal-400 bg-teal-50" : info.configured ? "border-gray-100 bg-white" : "border-dashed border-gray-200 bg-gray-50"
+    }`}>
+      <button
+        onClick={() => info.configured && !isActive && onActivate(id)}
+        disabled={saving || !info.configured || isActive}
+        className={`text-left p-4 w-full rounded-t-xl ${
+          isActive ? "" : info.configured ? "cursor-pointer hover:bg-gray-50/50" : "cursor-default"
+        }`}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-semibold text-gray-900">{info.label}</p>
+          <div className="flex items-center gap-1.5">
+            {isActive && <span className="px-2 py-0.5 rounded-full bg-teal-500 text-white text-[10px] font-bold">ACTIVE</span>}
+            <span className={`w-2 h-2 rounded-full ${info.configured ? "bg-teal-500" : "bg-gray-300"}`} />
+          </div>
+        </div>
+        <p className="text-[11px] text-gray-400 mb-1">{info.regions || info.website || ""}</p>
+        {info.currencies && (
+          <div className="flex flex-wrap gap-1 mb-1">
+            {info.currencies.map((c) => (
+              <span key={c} className="px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-gray-600 font-medium">{c}</span>
+            ))}
+          </div>
+        )}
+        {info.flow && (
+          <p className="text-[10px] text-gray-400 mt-1">{info.flow === "popup" ? "In-app popup" : "Hosted checkout page"}</p>
+        )}
+      </button>
+
+      <div className="px-4 pb-4 pt-2 border-t border-gray-100">
+        {info.keyPreview && !showKeyForm ? (
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-teal-600 font-mono font-medium">Key: {info.keyPreview}</span>
+            <button onClick={() => setShowKeyForm(true)} className="text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer">Update</button>
+          </div>
+        ) : (
+          <div className="flex gap-1.5">
+            <input
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder="Paste API key…"
+              className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-teal-400"
+            />
+            <button
+              onClick={handleSave}
+              disabled={!keyInput.trim() || keySaving}
+              className="px-3 py-1.5 rounded-lg bg-teal-500 text-white text-xs font-medium cursor-pointer disabled:opacity-40"
+            >
+              {keySaving ? "…" : "Save"}
+            </button>
+            {info.keyPreview && (
+              <button onClick={() => { setShowKeyForm(false); setKeyInput(""); }} className="px-2 py-1.5 text-xs text-gray-400 cursor-pointer">✕</button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Payment settings panel ────────────────────────────────
+const PaymentSettingsPanel = () => {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState(null);
+
+  useEffect(() => {
+    api.get("/admin/payment-settings")
+      .then(setSettings)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const toggle = async () => {
+    setSaving(true);
+    try { const d = await api.put("/admin/payment-settings", { enabled: !settings.enabled }); setSettings(d); }
+    catch (e) { setError(e.message); } finally { setSaving(false); }
+  };
+
+  const activate = async (gateway) => {
+    setSaving(true); setError(null);
+    try { const d = await api.put("/admin/payment-settings", { gateway }); setSettings(d); }
+    catch (e) { setError(e.response?.data?.error || e.message); } finally { setSaving(false); }
+  };
+
+  const saveGatewayKey = async (gateway, key) => {
+    setError(null);
+    const result = await api.put("/admin/payment-settings/key", { gateway, key });
+    setSettings((prev) => ({
+      ...prev,
+      gateways: {
+        ...prev.gateways,
+        [gateway]: { ...prev.gateways[gateway], configured: true, keyPreview: result.keyPreview },
+      },
+    }));
+  };
+
+  if (loading) return <div className="flex justify-center py-16"><img src="/favicon.png" alt="" className="w-10 h-10 animate-pulse" /></div>;
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3">
+          <p className="text-xs text-red-700 flex-1">{error}</p>
+          <button onClick={() => setError(null)} className="text-red-400 text-sm cursor-pointer">✕</button>
+        </div>
+      )}
+
+      {/* Master toggle */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-gray-900">Payment Processing</p>
+            <p className="text-xs text-gray-400 mt-0.5">Toggle all payment processing on or off across the platform</p>
+          </div>
+          <Toggle on={settings?.enabled} onClick={toggle} disabled={saving} />
+        </div>
+        {!settings?.enabled && (
+          <div className="mt-3 bg-amber-50 border border-amber-100 rounded-xl p-3">
+            <p className="text-xs text-amber-800">Payments are <span className="font-bold">disabled</span>. Users cannot upgrade their plan until re-enabled.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Gateway selection */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p className="text-sm font-bold text-gray-900 mb-1">Active Payment Gateway</p>
+        <p className="text-xs text-gray-400 mb-4">Paste each gateway's secret key below, then click a card to set it as active.</p>
+        <div className="grid sm:grid-cols-3 gap-3">
+          {Object.entries(settings?.gateways || {}).map(([id, info]) => (
+            <GatewayCard key={id} id={id} info={info} isActive={settings?.activeGateway === id} onActivate={activate} onSaveKey={saveGatewayKey} saving={saving} />
+          ))}
+        </div>
+        <div className="mt-4 pt-4 border-t border-gray-50 grid sm:grid-cols-3 gap-3 text-[11px] text-gray-400">
+          <div><span className="font-medium text-gray-500">Paystack</span> — paystack.com/developer → API Keys</div>
+          <div><span className="font-medium text-gray-500">Stripe</span> — dashboard.stripe.com → Developers → API Keys</div>
+          <div><span className="font-medium text-gray-500">Flutterwave</span> — dashboard.flutterwave.com → Settings → API</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Integrations panel ────────────────────────────────────
+const IntegrationsPanel = () => {
+  const [data, setData]     = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState(null);
+
+  useEffect(() => {
+    api.get("/admin/integrations")
+      .then(setData)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const updateEmail = async (patch) => {
+    setSaving(true); setError(null);
+    try {
+      const result = await api.put("/admin/integrations/email", patch);
+      setData((prev) => ({ ...prev, email: { ...prev.email, ...result } }));
+    } catch (e) { setError(e.response?.data?.error || e.message); }
+    finally { setSaving(false); }
+  };
+
+  const saveEmailKey = async (provider, key) => {
+    setError(null);
+    const result = await api.put("/admin/integrations/email/key", { provider, key });
+    setData((prev) => ({
+      ...prev,
+      email: {
+        ...prev.email,
+        providers: {
+          ...prev.email.providers,
+          [provider]: { ...prev.email.providers[provider], configured: true, keyPreview: result.keyPreview },
+        },
+      },
+    }));
+  };
+
+  const saveSentryKey = async (key) => {
+    setError(null);
+    await api.put("/admin/integrations/sentry/key", { key });
+    setData((prev) => ({ ...prev, sentry: { ...prev.sentry, configured: true } }));
+  };
+
+  const saveFromEmail = async (from) => {
+    setError(null);
+    await api.put("/admin/integrations/email/from", { from });
+    setData((prev) => ({ ...prev, email: { ...prev.email, notifyFromEmail: from } }));
+  };
+
+  if (loading) return <div className="flex justify-center py-16"><img src="/favicon.png" alt="" className="w-10 h-10 animate-pulse" /></div>;
+
+  const email = data?.email || {};
+  const sentry = data?.sentry || {};
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3">
+          <p className="text-xs text-red-700 flex-1">{error}</p>
+          <button onClick={() => setError(null)} className="text-red-400 text-sm cursor-pointer">✕</button>
+        </div>
+      )}
+
+      {/* Email provider */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm font-bold text-gray-900">Email Provider</p>
+            <p className="text-xs text-gray-400 mt-0.5">Controls contact form emails and transactional emails</p>
+          </div>
+          <Toggle on={email.enabled} onClick={() => updateEmail({ enabled: !email.enabled })} disabled={saving} />
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {Object.entries(email.providers || {}).map(([id, info]) => (
+            <GatewayCard
+              key={id} id={id} info={info}
+              isActive={email.activeProvider === id}
+              onActivate={(p) => updateEmail({ provider: p })}
+              onSaveKey={saveEmailKey}
+              saving={saving}
+            />
+          ))}
+        </div>
+        <div className="mt-4 pt-4 border-t border-gray-50 grid sm:grid-cols-2 gap-3 text-[11px] text-gray-400">
+          <div><span className="font-medium text-gray-500">Resend</span> — resend.com → API Keys → Create API Key</div>
+          <div><span className="font-medium text-gray-500">SendGrid</span> — app.sendgrid.com → Settings → API Keys</div>
+        </div>
+
+        {/* From email address */}
+        <div className="mt-4 pt-4 border-t border-gray-50">
+          <p className="text-xs font-semibold text-gray-700 mb-1">From email address</p>
+          <p className="text-[11px] text-gray-400 mb-2">
+            The sender address for verification and notification emails. Must be a verified domain on your email provider.
+          </p>
+          <FromEmailInput value={email.notifyFromEmail || ""} onSave={saveFromEmail} />
+        </div>
+      </div>
+
+      {/* Error tracking */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-sm font-bold text-gray-900">Sentry — Error Tracking</p>
+            <p className="text-xs text-gray-400 mt-0.5">Automatic error capture and performance monitoring</p>
+          </div>
+          <span className={`px-3 py-1 rounded-full text-xs font-bold ${sentry.configured ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500"}`}>
+            {sentry.configured ? "Active" : "Not configured"}
+          </span>
+        </div>
+        <SentryKeyInput configured={sentry.configured} onSave={saveSentryKey} />
+        <p className="text-[11px] text-gray-400 mt-2">sentry.io → your Node.js project → Settings → Client Keys → DSN</p>
+      </div>
+    </div>
+  );
+};
+
+// ─── From email input ──────────────────────────────────────
+const FromEmailInput = ({ value, onSave }) => {
+  const [input, setInput]   = useState(value || "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved]   = useState(false);
+
+  const handleSave = async () => {
+    if (!input.trim()) return;
+    setSaving(true);
+    try {
+      await onSave(input.trim());
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="email"
+        value={input}
+        onChange={(e) => { setInput(e.target.value); setSaved(false); }}
+        placeholder="Seevv <notifications@yourdomain.com>"
+        className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-400/30"
+        onKeyDown={(e) => e.key === "Enter" && handleSave()}
+      />
+      <button
+        onClick={handleSave}
+        disabled={saving || !input.trim()}
+        className="text-xs px-3 py-2 rounded-lg bg-brand-600 text-white font-medium hover:bg-brand-800 disabled:opacity-50 cursor-pointer transition-colors shrink-0"
+      >
+        {saving ? "Saving…" : saved ? "Saved ✓" : "Save"}
+      </button>
+    </div>
+  );
+};
+
+// ─── Sentry key input ──────────────────────────────────────
+const SentryKeyInput = ({ configured, onSave }) => {
+  const [keyInput, setKeyInput]       = useState("");
+  const [showForm, setShowForm]       = useState(!configured);
+  const [saving, setSaving]           = useState(false);
+
+  const handleSave = async () => {
+    if (!keyInput.trim()) return;
+    setSaving(true);
+    try { await onSave(keyInput.trim()); setKeyInput(""); setShowForm(false); }
+    finally { setSaving(false); }
+  };
+
+  if (configured && !showForm) {
+    return (
+      <div className="flex items-center gap-3 mt-1">
+        <span className="text-[11px] text-teal-600 font-mono font-medium">DSN configured</span>
+        <button onClick={() => setShowForm(true)} className="text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer">Update</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-2 mt-1">
+      <input
+        type="password"
+        value={keyInput}
+        onChange={(e) => setKeyInput(e.target.value)}
+        placeholder="https://...@sentry.io/..."
+        className="flex-1 text-xs px-3 py-2 rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-teal-400"
+      />
+      <button
+        onClick={handleSave}
+        disabled={!keyInput.trim() || saving}
+        className="px-4 py-2 rounded-lg bg-teal-500 text-white text-xs font-medium cursor-pointer disabled:opacity-40"
+      >
+        {saving ? "…" : "Save"}
+      </button>
+      {configured && (
+        <button onClick={() => { setShowForm(false); setKeyInput(""); }} className="px-2 text-xs text-gray-400 cursor-pointer">✕</button>
+      )}
+    </div>
+  );
+};
+
+
+// ─── Revenue panel ────────────────────────────────────────
+const RevenuePanel = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    api.get("/admin/revenue").then(setData).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" /></div>;
+  if (!data) return <p className="text-sm text-gray-400 py-8 text-center">Revenue data unavailable</p>;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Total revenue" value={`$${(data.totalRevenue / 100).toFixed(2)}`} />
+        <StatCard label="Last 30 days"  value={`$${(data.recentRevenue / 100).toFixed(2)}`} />
+        <StatCard label="Paid users"    value={data.paidUsers} />
+        <StatCard label="Promos used"   value={data.promosApplied} sub={`$${(data.totalDiscount / 100).toFixed(2)} discounted`} />
+      </div>
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Revenue by plan</p>
+        <div className="grid grid-cols-3 gap-4">
+          {Object.entries(data.byPlan || {}).map(([plan, amount]) => (
+            <div key={plan} className="text-center p-3 bg-gray-50 rounded-xl">
+              <p className="text-lg font-bold text-gray-900">${(amount / 100).toFixed(0)}</p>
+              <p className="text-[10px] text-gray-400 capitalize mt-0.5">{plan.replace("_", " ")}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      {data.recentEvents?.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 px-5 py-4 border-b border-gray-100">Recent transactions</p>
+          <div className="divide-y divide-gray-50">
+            {data.recentEvents.map((e, i) => (
+              <div key={i} className="flex items-center justify-between px-5 py-3">
+                <div>
+                  <p className="text-xs font-semibold text-gray-900">{e.plan}</p>
+                  <p className="text-[10px] text-gray-400">{e.gateway} · {new Date(e.created_at).toLocaleDateString()}</p>
+                </div>
+                <p className="text-sm font-bold text-gray-900">{e.currency} {(e.amount / 100).toFixed(2)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Audit logs panel ─────────────────────────────────────
+const AuditLogsPanel = () => {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    api.get("/admin/audit-logs?limit=100").then((d) => setLogs(d.logs || [])).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" /></div>;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <p className="text-xs font-bold uppercase tracking-widest text-gray-400 px-5 py-4 border-b border-gray-100">Admin audit trail</p>
+      {logs.length === 0 ? (
+        <p className="text-sm text-gray-400 py-10 text-center">No audit events recorded yet</p>
+      ) : (
+        <div className="divide-y divide-gray-50 max-h-[70vh] overflow-y-auto">
+          {logs.map((log) => (
+            <div key={log.id} className="flex items-start gap-4 px-5 py-3">
+              <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0 text-gray-400 text-[10px] font-bold">
+                {log.admin?.full_name?.[0] || "?"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-gray-900">{log.action}</p>
+                <p className="text-[10px] text-gray-400 truncate">{log.target_type} · {log.target_id} · by {log.admin?.full_name || log.admin?.email || "Admin"}</p>
+              </div>
+              <p className="text-[10px] text-gray-300 shrink-0">{new Date(log.created_at).toLocaleString()}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Moderation panel ─────────────────────────────────────
+const ModerationPanel = () => {
+  const [flags, setFlags] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("pending");
+
+  useEffect(() => {
+    setLoading(true);
+    api.get(`/admin/moderation?status=${status}`).then((d) => setFlags(d.flags || [])).catch(() => {}).finally(() => setLoading(false));
+  }, [status]);
+
+  const handleAction = async (id, newStatus) => {
+    try {
+      await api.patch(`/admin/moderation/${id}`, { status: newStatus });
+      setFlags((prev) => prev.filter((f) => f.id !== id));
+    } catch { /* ignore */ }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {["pending", "reviewed", "actioned", "dismissed"].map((s) => (
+          <button key={s} onClick={() => setStatus(s)}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg cursor-pointer transition-colors ${status === s ? "bg-brand-600 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-brand-300"}`}
+          >{s.charAt(0).toUpperCase() + s.slice(1)}</button>
+        ))}
+      </div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" /></div>
+        ) : flags.length === 0 ? (
+          <p className="text-sm text-gray-400 py-10 text-center">No {status} flags</p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {flags.map((f) => (
+              <div key={f.id} className="flex items-start justify-between gap-4 px-5 py-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-gray-900">{f.content_type} · {f.content_id}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{f.reason} · reported by {f.reporter?.full_name || "Unknown"}</p>
+                  <p className="text-[10px] text-gray-300 mt-0.5">{new Date(f.created_at).toLocaleDateString()}</p>
+                </div>
+                {status === "pending" && (
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => handleAction(f.id, "actioned")} className="px-2.5 py-1 text-[10px] font-semibold bg-red-50 text-red-600 rounded-lg cursor-pointer hover:bg-red-100">Action</button>
+                    <button onClick={() => handleAction(f.id, "dismissed")} className="px-2.5 py-1 text-[10px] font-semibold bg-gray-100 text-gray-600 rounded-lg cursor-pointer hover:bg-gray-200">Dismiss</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Feature flags panel ──────────────────────────────────
+const FeatureFlagsPanel = () => {
+  const [flags, setFlags] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get("/admin/feature-flags").then((d) => setFlags(d.flags || [])).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const toggle = async (key, enabled) => {
+    setFlags((prev) => prev.map((f) => f.key === key ? { ...f, enabled } : f));
+    await api.patch(`/admin/feature-flags/${key}`, { enabled }).catch(() => {});
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" /></div>;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <p className="text-xs font-bold uppercase tracking-widest text-gray-400 px-5 py-4 border-b border-gray-100">Feature flags</p>
+      {flags.length === 0 ? (
+        <p className="text-sm text-gray-400 py-10 text-center">No feature flags configured</p>
+      ) : (
+        <div className="divide-y divide-gray-50">
+          {flags.map((f) => (
+            <div key={f.key} className="flex items-center justify-between px-5 py-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{f.key}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{f.applies_to || "all users"} · {f.rollout_pct ?? 100}% rollout</p>
+              </div>
+              <button
+                onClick={() => toggle(f.key, !f.enabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${f.enabled ? "bg-teal-500" : "bg-gray-200"}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${f.enabled ? "translate-x-6" : "translate-x-1"}`} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Organizations panel ──────────────────────────────────
+const OrganizationsPanel = () => {
+  const [orgs, setOrgs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  useEffect(() => {
+    api.get("/admin/organizations").then((d) => setOrgs(d.organizations || [])).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const createOrg = async () => {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const org = await api.post("/admin/organizations", { name: newName.trim() });
+      setOrgs((prev) => [org, ...prev]);
+      setNewName("");
+    } catch { /* ignore */ } finally {
+      setCreating(false);
+    }
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" /></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex gap-3">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && createOrg()}
+          placeholder="Organization name"
+          className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-600"
+        />
+        <button
+          onClick={createOrg}
+          disabled={creating || !newName.trim()}
+          className="px-4 py-2 bg-brand-600 text-white text-xs font-semibold rounded-xl hover:bg-brand-800 cursor-pointer disabled:opacity-50"
+        >{creating ? "Creating…" : "Create"}</button>
+      </div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {orgs.length === 0 ? (
+          <p className="text-sm text-gray-400 py-10 text-center">No organizations yet</p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {orgs.map((org) => (
+              <div key={org.id} className="flex items-center justify-between px-5 py-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{org.name}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{org.domain || "No domain"} · {org.plan || "starter"}</p>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${org.active !== false ? "bg-teal-50 text-teal-700" : "bg-gray-100 text-gray-400"}`}>
+                  {org.active !== false ? "Active" : "Inactive"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── White-label panel ─────────────────────────────────────
+const WhitelabelPanel = () => {
+  const [settings, setSettings] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api.get("/whitelabel").then((d) => setSettings(d.settings || {})).catch(() => {});
+  }, []);
+
+  const set = (key, val) => setSettings((p) => ({ ...p, [key]: val }));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.patch("/whitelabel", settings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) { alert(e.message); } finally { setSaving(false); }
+  };
+
+  const fields = [
+    { key: "whitelabel_enabled",      label: "White-label enabled", type: "toggle" },
+    { key: "whitelabel_company_name", label: "Company name",        type: "text", placeholder: "Acme Corp" },
+    { key: "whitelabel_logo_url",     label: "Logo URL",            type: "text", placeholder: "https://..." },
+    { key: "whitelabel_primary_color",label: "Primary colour",      type: "text", placeholder: "#033876" },
+    { key: "whitelabel_support_email",label: "Support email",       type: "text", placeholder: "support@acme.com" },
+    { key: "whitelabel_domain",       label: "Custom domain",       type: "text", placeholder: "careers.acme.com" },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-sm font-bold text-gray-900">White-label settings</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Customise Seevv's branding for enterprise clients</p>
+      </div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+        {fields.map(({ key, label, type, placeholder }) => (
+          <div key={key} className="flex items-center justify-between gap-6 px-5 py-4">
+            <label className="text-sm font-medium text-gray-800">{label}</label>
+            {type === "toggle" ? (
+              <button
+                onClick={() => set(key, settings[key] === "true" ? "false" : "true")}
+                className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${settings[key] === "true" ? "bg-brand-600" : "bg-gray-200"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${settings[key] === "true" ? "translate-x-5" : ""}`} />
+              </button>
+            ) : (
+              <input
+                value={settings[key] || ""}
+                onChange={(e) => set(key, e.target.value)}
+                placeholder={placeholder}
+                className="w-64 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-600"
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={save} disabled={saving}
+          className="px-5 py-2 bg-brand-600 text-white text-sm font-semibold rounded-xl cursor-pointer hover:bg-brand-800 disabled:opacity-50"
+        >{saving ? "Saving…" : "Save settings"}</button>
+        {saved && <p className="text-xs text-teal-600 font-semibold">✓ Saved</p>}
+      </div>
+    </div>
+  );
+};
+
+// ─── ATS panel ─────────────────────────────────────────────
+const PROVIDERS = [
+  { id: "greenhouse", name: "Greenhouse", docs: "https://developers.greenhouse.io" },
+  { id: "lever",      name: "Lever",      docs: "https://hire.lever.co/developer" },
+  { id: "workday",    name: "Workday",    docs: "https://community.workday.com/api" },
+  { id: "ashby",      name: "Ashby",      docs: "https://developers.ashbyhq.com" },
+  { id: "teamtailor", name: "Teamtailor", docs: "https://docs.teamtailor.com" },
+];
+
+const AtsPanel = () => {
+  const [integrations, setIntegrations] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [apiKey, setApiKey] = useState("");
+  const [testing, setTesting] = useState(null);
+  const [testResult, setTestResult] = useState(null);
+
+  useEffect(() => {
+    api.get("/ats").then((d) => setIntegrations(d.integrations || [])).catch(() => {});
+  }, []);
+
+  const getInt = (id) => integrations.find((i) => i.provider === id) || { provider: id, enabled: false, apiKey: null };
+
+  const toggle = async (id) => {
+    const cur = getInt(id);
+    await api.patch(`/ats/${id}`, { enabled: !cur.enabled }).catch(() => {});
+    setIntegrations((p) => p.map((i) => i.provider === id ? { ...i, enabled: !i.enabled } : i));
+  };
+
+  const saveKey = async (id) => {
+    if (!apiKey.trim()) return;
+    await api.patch(`/ats/${id}`, { apiKey: apiKey.trim(), enabled: true }).catch(() => {});
+    setIntegrations((p) => p.map((i) => i.provider === id ? { ...i, apiKey: "••••••••", enabled: true } : i));
+    setEditing(null); setApiKey("");
+  };
+
+  const test = async (id) => {
+    setTesting(id);
+    try {
+      const r = await api.post(`/ats/${id}/test`);
+      setTestResult({ id, ok: r.success, msg: r.message });
+    } catch (e) { setTestResult({ id, ok: false, msg: e.message }); } finally { setTesting(null); }
+    setTimeout(() => setTestResult(null), 5000);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-sm font-bold text-gray-900">ATS integrations</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Connect Seevv to your applicant tracking system</p>
+      </div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+        {PROVIDERS.map(({ id, name }) => {
+          const int = getInt(id);
+          return (
+            <div key={id} className="px-5 py-4 space-y-2">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-gray-900">{name}</p>
+                  <p className="text-[10px] text-gray-400">{int.apiKey ? "API key configured" : "No API key set"}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {int.apiKey && (
+                    <button onClick={() => test(id)} disabled={testing === id}
+                      className="text-xs text-brand-600 hover:text-brand-800 cursor-pointer font-medium disabled:opacity-50"
+                    >{testing === id ? "Testing…" : "Test"}</button>
+                  )}
+                  <button onClick={() => { setEditing(id); setApiKey(""); }}
+                    className="text-xs text-gray-500 hover:text-brand-600 cursor-pointer">
+                    {int.apiKey ? "Update key" : "Add key"}
+                  </button>
+                  <button onClick={() => toggle(id)}
+                    className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${int.enabled ? "bg-brand-600" : "bg-gray-200"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${int.enabled ? "translate-x-4" : ""}`} />
+                  </button>
+                </div>
+              </div>
+              {testResult?.id === id && (
+                <p className={`text-xs font-medium ${testResult.ok ? "text-teal-600" : "text-red-500"}`}>{testResult.msg}</p>
+              )}
+              {editing === id && (
+                <div className="flex gap-2 mt-2">
+                  <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password"
+                    placeholder="Paste API key…"
+                    className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-600"
+                  />
+                  <button onClick={() => saveKey(id)} disabled={!apiKey.trim()}
+                    className="px-3 py-1.5 bg-brand-600 text-white text-xs font-semibold rounded-lg cursor-pointer hover:bg-brand-700 disabled:opacity-50"
+                  >Save</button>
+                  <button onClick={() => setEditing(null)} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer px-2">Cancel</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -617,11 +1661,11 @@ const Admin = () => {
     } catch (err) { setError(err.message); }
   }, [pendingVerifications]);
 
-  const handleRejectVerif = useCallback(async (requestId) => {
+  const handleRejectVerif = useCallback(async (requestId, reason = "") => {
     const req = pendingVerifications.find((r) => r.id === requestId);
     if (!req) return;
     try {
-      await api.patch("/admin/verification-requests/reject", { userId: req.user_id, badgeType: req.badge_type });
+      await api.patch("/admin/verification-requests/reject", { userId: req.user_id, badgeType: req.badge_type, reason });
       setPendingVerifications((prev) => prev.filter((r) => r.id !== requestId));
       if (prevVerifCountRef.current !== null) prevVerifCountRef.current -= 1;
     } catch (err) { setError(err.message); }
@@ -682,6 +1726,26 @@ const Admin = () => {
       group: "Analytics",
       items: [
         { id: "platform_stats", label: "Platform Stats", icon: <Icon d={["M18 20V10", "M12 20V4", "M6 20v-6"]} /> },
+        { id: "revenue",        label: "Revenue",        icon: <Icon d={["M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"]} /> },
+        { id: "audit_logs",     label: "Audit Logs",     icon: <Icon d={["M9 12h6", "M9 16h6", "M9 8h6", "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"]} /> },
+      ],
+    },
+    {
+      group: "Moderation",
+      items: [
+        { id: "moderation",    label: "Flagged Content", icon: <Icon d={["M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z", "M12 9v4", "M12 17h.01"]} /> },
+        { id: "feature_flags", label: "Feature Flags",   icon: <Icon d={["M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z", "M4 22v-7"]} /> },
+        { id: "organizations", label: "Organizations",   icon: <Icon d={["M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2", "M23 21v-2a4 4 0 0 0-3-3.87", "M16 3.13a4 4 0 0 1 0 7.75"]} /> },
+      ],
+    },
+    {
+      group: "Settings",
+      items: [
+        { id: "ai_settings",      label: "AI Configuration",  icon: <Icon d={["M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"]} /> },
+        { id: "payment_settings", label: "Payment Gateway",   icon: <Icon d={["M2 9h20M2 15h20M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"]} /> },
+        { id: "integrations",     label: "Integrations",      icon: <Icon d={["M4 6h16M4 12h16M4 18h16"]} /> },
+        { id: "whitelabel",       label: "White-label",        icon: <Icon d={["M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"]} /> },
+        { id: "ats",              label: "ATS integrations",   icon: <Icon d={["M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71", "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"]} /> },
       ],
     },
   ];
@@ -694,6 +1758,16 @@ const Admin = () => {
     cvs:            "Candidate CVs",
     cover_letters:  "Cover Letters",
     platform_stats: "Platform Stats",
+    revenue:        "Revenue Dashboard",
+    audit_logs:     "Audit Logs",
+    moderation:     "Flagged Content",
+    feature_flags:  "Feature Flags",
+    organizations:  "Organizations",
+    ai_settings:      "AI Configuration",
+    payment_settings: "Payment Gateway",
+    integrations:     "Integrations",
+    whitelabel:       "White-label Settings",
+    ats:              "ATS Integrations",
   };
 
   return (
@@ -776,6 +1850,11 @@ const Admin = () => {
                 {section === "cvs" && "All CV versions across the platform"}
                 {section === "cover_letters" && "All cover letters across the platform"}
                 {section === "platform_stats" && "In-depth platform metrics and analytics"}
+                {section === "ai_settings"      && "Toggle AI on/off and switch providers"}
+                {section === "payment_settings" && "Toggle payments on/off and switch gateway"}
+                {section === "integrations"     && "Email provider, error tracking, and other APIs"}
+                {section === "whitelabel"       && "Custom branding for enterprise clients"}
+                {section === "ats"              && "Connect to applicant tracking systems"}
               </p>
             </div>
           </div>
@@ -956,6 +2035,32 @@ const Admin = () => {
 
           {/* ── Platform Stats ──────────────────────── */}
           {section === "platform_stats" && <PlatformStats />}
+
+          {/* ── AI Settings ────────────────────────── */}
+          {section === "ai_settings"      && <AISettingsPanel />}
+          {section === "payment_settings" && <PaymentSettingsPanel />}
+          {section === "integrations"     && <IntegrationsPanel />}
+
+          {/* ── Revenue ─────────────────────────────── */}
+          {section === "revenue" && <RevenuePanel />}
+
+          {/* ── Audit Logs ──────────────────────────── */}
+          {section === "audit_logs" && <AuditLogsPanel />}
+
+          {/* ── Moderation ──────────────────────────── */}
+          {section === "moderation" && <ModerationPanel />}
+
+          {/* ── Feature Flags ───────────────────────── */}
+          {section === "feature_flags" && <FeatureFlagsPanel />}
+
+          {/* ── Organizations ───────────────────────── */}
+          {section === "organizations" && <OrganizationsPanel />}
+
+          {/* ── White-label ──────────────────────────── */}
+          {section === "whitelabel" && <WhitelabelPanel />}
+
+          {/* ── ATS ─────────────────────────────────── */}
+          {section === "ats" && <AtsPanel />}
 
         </main>
       </div>

@@ -78,10 +78,19 @@ const JobDetailModal = ({ job, onClose, onStatusChange, navigate }) => {
   const [notes, setNotes] = useState(job.notes || "");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(job.status || "saved");
+  const [interviewDate, setInterviewDate] = useState(job.interview_date ? job.interview_date.slice(0, 16) : "");
+  const [contactName, setContactName] = useState(job.contact_name || "");
+  const [contactEmail, setContactEmail] = useState(job.contact_email || "");
+  const [salaryDiscussed, setSalaryDiscussed] = useState(job.salary_discussed || "");
 
   const handleSave = async () => {
     setSaving(true);
-    await onStatusChange(job.id, status, notes);
+    await onStatusChange(job.id, status, notes, {
+      interview_date: interviewDate || null,
+      contact_name: contactName,
+      contact_email: contactEmail,
+      salary_discussed: salaryDiscussed,
+    });
     setSaving(false);
     onClose();
   };
@@ -116,14 +125,49 @@ const JobDetailModal = ({ job, onClose, onStatusChange, navigate }) => {
             </div>
           </div>
 
+          {/* Interview date */}
+          {(status === "interview" || status === "offer" || interviewDate) && (
+            <div>
+              <p className="text-xs font-semibold text-gray-600 mb-2">Interview date & time</p>
+              <input
+                type="datetime-local"
+                value={interviewDate}
+                onChange={(e) => setInterviewDate(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-600"
+              />
+            </div>
+          )}
+
+          {/* Contact */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs font-semibold text-gray-600 mb-2">Contact name</p>
+              <input
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                placeholder="Hiring manager"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-600"
+              />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-600 mb-2">Salary discussed</p>
+              <input
+                value={salaryDiscussed}
+                onChange={(e) => setSalaryDiscussed(e.target.value)}
+                placeholder="e.g. £60k"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-600"
+              />
+            </div>
+          </div>
+
           {/* Notes */}
           <div>
             <p className="text-xs font-semibold text-gray-600 mb-2">Notes</p>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-              placeholder="Recruiter name, interview date, salary discussed…"
+              rows={3}
+              placeholder="Additional notes…"
               className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-600 resize-none"
             />
           </div>
@@ -194,11 +238,11 @@ const ApplicationTracker = () => {
 
   useEffect(() => { loadJobs(); }, [loadJobs]);
 
-  const handleStatusChange = async (id, status, notes) => {
+  const handleStatusChange = async (id, status, notes, extra = {}) => {
     setError(null);
     try {
-      await api.patch(`/jobs/${id}/status`, { status, ...(notes !== undefined && { notes }) });
-      setJobs((prev) => prev.map((j) => j.id === id ? { ...j, status, ...(notes !== undefined && { notes }), ...(status === "applied" && { applied_at: new Date().toISOString() }) } : j));
+      await api.patch(`/jobs/${id}/status`, { status, ...(notes !== undefined && { notes }), ...extra });
+      setJobs((prev) => prev.map((j) => j.id === id ? { ...j, status, ...(notes !== undefined && { notes }), ...extra, ...(status === "applied" && { applied_at: new Date().toISOString() }) } : j));
       toast.success("Application updated.");
     } catch (err) {
       setError(err.message);

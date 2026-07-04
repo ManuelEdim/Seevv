@@ -51,7 +51,7 @@ router.post("/", async (req, res) => {
 router.patch("/:id/status", async (req, res) => {
   const userId = req.user.id;
   const { id } = req.params;
-  const { status, notes } = req.body;
+  const { status, notes, interview_date, interview_notes, contact_name, contact_email, salary_discussed } = req.body;
 
   const VALID_STATUSES = ["saved", "applied", "interview", "offer", "rejected"];
   if (status && !VALID_STATUSES.includes(status)) {
@@ -64,6 +64,11 @@ router.patch("/:id/status", async (req, res) => {
     if (status === "applied") updates.applied_at = new Date().toISOString();
   }
   if (notes !== undefined) updates.notes = notes;
+  if (interview_date !== undefined) updates.interview_date = interview_date || null;
+  if (interview_notes !== undefined) updates.interview_notes = interview_notes;
+  if (contact_name !== undefined) updates.contact_name = contact_name;
+  if (contact_email !== undefined) updates.contact_email = contact_email;
+  if (salary_discussed !== undefined) updates.salary_discussed = salary_discussed;
   updates.updated_at = new Date().toISOString();
 
   try {

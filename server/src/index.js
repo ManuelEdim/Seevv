@@ -45,6 +45,15 @@ import rejectionIntelRouter from "./routes/rejectionIntel.js";
 import negotiationRouter from "./routes/negotiation.js";
 import outreachRouter from "./routes/outreach.js";
 import applyAssistRouter from "./routes/applyAssist.js";
+import searchRouter from "./routes/search.js";
+import userRouter from "./routes/user.js";
+import promoRouter from "./routes/promo.js";
+import shortlistsRouter from "./routes/shortlists.js";
+import savedSearchesRouter from "./routes/savedSearches.js";
+import cvReviewRouter from "./routes/cvReview.js";
+import webhooksRouter from "./routes/webhooks.js";
+import whitelabelRouter from "./routes/whitelabel.js";
+import atsRouter from "./routes/ats.js";
 
 // Middleware
 import errorHandler from "./middleware/errorHandler.js";
@@ -55,11 +64,12 @@ import {
   bulkLimiter,
   contactLimiter,
 } from "./middleware/rateLimiter.js";
+import { isAIEnabled } from "./lib/aiProvider.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ─── Trust proxy (Render sits behind a load balancer) ─────
+// ─── Trust proxy (Vercel sits behind a load balancer) ─────
 // Required for req.ip to reflect the real client IP, not the proxy IP
 app.set("trust proxy", 1);
 
@@ -117,6 +127,11 @@ const AI_ROUTES = [
   "/api/apply-assist",
 ];
 app.use(AI_ROUTES, aiLimiter);
+app.use(AI_ROUTES, async (req, res, next) => {
+  const enabled = await isAIEnabled();
+  if (!enabled) return res.status(503).json({ error: "AI features are currently disabled by the administrator." });
+  next();
+});
 
 // ─── Routes ────────────────────────────────────────────────
 app.use("/api/health", healthRouter);
@@ -146,6 +161,15 @@ app.use("/api/rejection-intel", rejectionIntelRouter);
 app.use("/api/negotiation", negotiationRouter);
 app.use("/api/outreach", outreachRouter);
 app.use("/api/apply-assist", applyAssistRouter);
+app.use("/api/search", searchRouter);
+app.use("/api/user", userRouter);
+app.use("/api/promo", promoRouter);
+app.use("/api/shortlists", shortlistsRouter);
+app.use("/api/saved-searches", savedSearchesRouter);
+app.use("/api/cv-review", cvReviewRouter);
+app.use("/api/webhooks", webhooksRouter);
+app.use("/api/whitelabel", whitelabelRouter);
+app.use("/api/ats", atsRouter);
 
 // ─── 404 handler ───────────────────────────────────────────
 app.use((req, res) => {

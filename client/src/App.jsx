@@ -42,6 +42,7 @@ import RejectionIntel from "@/pages/RejectionIntel";
 import NegotiationCoach from "@/pages/NegotiationCoach";
 import RecruiterOutreach from "@/pages/RecruiterOutreach";
 import ApplyAssist from "@/pages/ApplyAssist";
+import CvShareReview from "@/pages/CvShareReview";
 
 const App = () => {
   const { isLoading } = useAuth();
@@ -336,6 +337,9 @@ const App = () => {
         <Route path="/negotiation-coach" element={<ProtectedRoute><AppLayout><NegotiationCoach /></AppLayout></ProtectedRoute>} />
         <Route path="/recruiter-outreach" element={<ProtectedRoute><AppLayout><RecruiterOutreach /></AppLayout></ProtectedRoute>} />
         <Route path="/apply-assist" element={<ProtectedRoute><AppLayout><ApplyAssist /></AppLayout></ProtectedRoute>} />
+
+        {/* Public CV share review — no auth required */}
+        <Route path="/review/:token" element={<CvShareReview />} />
 
         {/* 403 / 401 */}
         <Route path="/unauthorized" element={<Unauthorised />} />

@@ -10,6 +10,7 @@ import { signOut } from "@/lib/auth";
 import { useAuthStore } from "@/store";
 import { supabase } from "@/lib/supabase";
 import { detectIsNigerian, COUNTRIES } from "@/lib/location";
+import api from "@/lib/api";
 
 const profileSchema = z.object({
   full_name: z.string().min(2, "Name must be at least 2 characters"),
@@ -78,6 +79,11 @@ const Profile = () => {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteText, setDeleteText] = useState("");
+  const [deletionRequested, setDeletionRequested] = useState(false);
+  const [deletionLoading, setDeletionLoading] = useState(false);
+  const [referral, setReferral] = useState(null);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
 
   // Save / edit toggle states
   const [countrySaved, setCountrySaved] = useState(false);
@@ -124,6 +130,64 @@ const Profile = () => {
   }, [profile?.id, user?.email, profile, resetProfile]);
 
   const isNigerian = country === "NG" || (!country && detectIsNigerian());
+
+  // ── Load referral + MFA status once profile is known ──────
+  useEffect(() => {
+    if (!user) return;
+    api.get("/user/referral").then(setReferral).catch(() => {});
+    api.get("/user/mfa-status").then((d) => setMfaEnabled(d.enabled)).catch(() => {});
+    api.get("/user/export").then((d) => {
+      if (d?.deletion_requested_at) setDeletionRequested(true);
+    }).catch(() => {});
+  }, [user]);
+
+  const handleExportData = async () => {
+    setExportLoading(true);
+    try {
+      // Hit the export endpoint raw — it returns a JSON file attachment
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/user/export`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `seevv-data-export-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err.message || "Export failed");
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleRequestDeletion = async () => {
+    setDeletionLoading(true);
+    try {
+      await api.post("/user/request-deletion");
+      setDeletionRequested(true);
+      setShowDeleteConfirm(false);
+      setDeleteText("");
+      toast.success("Deletion requested. Your account will be deleted in 14 days. You can cancel at any time from here.");
+    } catch (err) {
+      toast.error(err.message || "Failed to request deletion");
+    } finally {
+      setDeletionLoading(false);
+    }
+  };
+
+  const handleCancelDeletion = async () => {
+    try {
+      await api.delete("/user/cancel-deletion");
+      setDeletionRequested(false);
+      toast.success("Deletion cancelled. Your account is safe.");
+    } catch (err) {
+      toast.error(err.message || "Failed to cancel deletion");
+    }
+  };
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -769,10 +833,9 @@ const Profile = () => {
                   <Button
                     variant="danger"
                     size="sm"
-                    disabled={deleteText !== "DELETE"}
-                    onClick={() =>
-                      toast.info("Account deletion coming in a future update")
-                    }
+                    disabled={deleteText !== "DELETE" || deletionLoading}
+                    isLoading={deletionLoading}
+                    onClick={handleRequestDeletion}
                   >
                     Delete permanently
                   </Button>
@@ -792,6 +855,80 @@ const Profile = () => {
           </div>
         </Section>
       </div>
+
+      {/* ── Deletion pending banner ──────────────────────── */}
+      {deletionRequested && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Account deletion scheduled</p>
+            <p className="text-xs text-amber-600 mt-0.5">Your account will be permanently deleted in 14 days. Cancel any time before then.</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleCancelDeletion}>Cancel deletion</Button>
+        </div>
+      )}
+
+      {/* ── Data & privacy section ───────────────────────── */}
+      <Section title="Data & privacy" description="Export your data or manage account deletion">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between py-3 border-b border-gray-50">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Export all your data</p>
+              <p className="text-xs text-gray-400">Download a JSON file with your CVs, job targets, cover letters, and account data</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleExportData} isLoading={exportLoading}>
+              Export
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Two-factor authentication</p>
+              <p className="text-xs text-gray-400">{mfaEnabled ? "2FA is active on your account" : "Add an extra layer of security"}</p>
+            </div>
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${mfaEnabled ? "bg-teal-50 text-teal-700" : "bg-gray-100 text-gray-500"}`}>
+              {mfaEnabled ? "Enabled" : "Not set up"}
+            </span>
+          </div>
+        </div>
+      </Section>
+
+      {/* ── Referral section ─────────────────────────────── */}
+      {referral && (
+        <Section title="Refer a friend" description="Share your referral link — earn rewards when friends upgrade">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+                <p className="text-xs text-gray-400 mb-0.5">Your referral link</p>
+                <p className="text-sm font-mono text-gray-800 truncate">{referral.referralUrl}</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => {
+                  navigator.clipboard?.writeText(referral.referralUrl);
+                  toast.success("Referral link copied!");
+                }}
+              >
+                Copy
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Total referrals", value: referral.stats?.total ?? 0 },
+                { label: "Converted", value: referral.stats?.converted ?? 0 },
+                { label: "Your code", value: referral.code },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-lg font-bold text-gray-900">{value}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Section>
+      )}
     </div>
   );
 };

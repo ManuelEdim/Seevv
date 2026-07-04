@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui";
 import { useToast } from "@/context/ToastContext";
 import useAuthStore from "@/store/authStore";
 import api from "@/lib/api";
+
 
 // ─── Currency config ───────────────────────────────────────
 const currencies = [
@@ -19,8 +20,8 @@ const PRICE_MAP = {
   pro_plus:{ USD: 39, GBP: 29, NGN: 18000 },
 };
 
-// Paystack plan keys — maps planId + currency to the key the backend uses
-const PAYSTACK_KEY = {
+// Maps planId + currency to the backend plan key
+const PLAN_KEY = {
   starter: { USD: "starter_usd", GBP: "starter_gbp", NGN: "starter_ngn" },
   pro:     { USD: "pro_usd",     GBP: "pro_gbp",     NGN: "pro_ngn"     },
   pro_plus:{ USD: "pro_plus_usd",GBP: "pro_plus_gbp",NGN: "pro_plus_ngn"},
@@ -289,6 +290,7 @@ const usePaystackScript = () => {
 // ─── Pricing page ──────────────────────────────────────────
 const Pricing = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const user = useAuthStore((s) => s.user);
   const paystackReady = usePaystackScript();
@@ -296,8 +298,54 @@ const Pricing = () => {
   const [billing, setBilling] = useState("monthly");
   const [currencyCode, setCurrencyCode] = useState("NGN");
   const [loadingPlan, setLoadingPlan] = useState(null);
+  const [verifying, setVerifying] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promoValidating, setPromoValidating] = useState(false);
+  const [promoResult, setPromoResult] = useState(null); // { valid, codeId, discountType, discountValue, description }
 
   const currentPlan = user?.plan || "free";
+
+  const validatePromo = async () => {
+    if (!promoCode.trim()) return;
+    setPromoValidating(true);
+    try {
+      const result = await api.post("/promo/validate", { code: promoCode.trim() });
+      setPromoResult(result);
+      toast.success(`Promo applied: ${result.description || "Discount active"}`);
+    } catch (err) {
+      setPromoResult(null);
+      toast.error(err.message || "Invalid promo code");
+    } finally {
+      setPromoValidating(false);
+    }
+  };
+
+  // Handle redirect-based gateway callbacks (Stripe, Flutterwave)
+  useEffect(() => {
+    const ref    = searchParams.get("ref");       // Stripe: ?ref={CHECKOUT_SESSION_ID}
+    const txRef  = searchParams.get("tx_ref");    // Flutterwave: ?tx_ref=seevv_...
+    const status = searchParams.get("status");    // Flutterwave: ?status=successful
+    const gateway = searchParams.get("gateway");  // optional marker
+
+    const refToVerify = ref || (status === "successful" ? txRef : null);
+    if (!refToVerify || !user) return;
+
+    setVerifying(true);
+    api.get(`/payments/verify/${refToVerify}`)
+      .then((data) => {
+        toast.success(`You're now on the ${data.plan} plan. Welcome to the full Seevv experience!`);
+        // Clean URL then redirect to dashboard
+        window.history.replaceState({}, "", "/pricing");
+        navigate("/dashboard");
+      })
+      .catch((err) => {
+        toast.error(`Payment verification failed: ${err.message}. Contact support if you were charged.`);
+        window.history.replaceState({}, "", "/pricing");
+      })
+      .finally(() => setVerifying(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const handleSelect = useCallback(async (planId) => {
     if (!user) {
@@ -305,12 +353,8 @@ const Pricing = () => {
       navigate("/login");
       return;
     }
-    if (!paystackReady) {
-      toast.error("Payment system is loading, please try again in a moment.");
-      return;
-    }
 
-    const planKey = PAYSTACK_KEY[planId]?.[currencyCode];
+    const planKey = PLAN_KEY[planId]?.[currencyCode];
     if (!planKey) {
       toast.error("This plan/currency combination is not available yet.");
       return;
@@ -319,38 +363,47 @@ const Pricing = () => {
     setLoadingPlan(planId);
 
     try {
-      const { reference, access_code } = await api.post("/payments/initialize", { planKey });
+      const callbackUrl = `${window.location.origin}/pricing`;
+      const result = await api.post("/payments/initialize", { planKey, callbackUrl, cancelUrl: callbackUrl });
 
-      const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
-      const amount = PRICE_MAP[planId][currencyCode];
-
-      const popup = window.PaystackPop.setup({
-        key: publicKey,
-        email: user.email,
-        amount: currencyCode === "NGN" ? amount * 100 : amount * 100,
-        currency: currencyCode,
-        ref: reference,
-        access_code,
-        metadata: { planId, planKey },
-        onSuccess: async (txn) => {
-          try {
-            setLoadingPlan(planId);
-            await api.get(`/payments/verify/${txn.reference}`);
-            toast.success(`You're now on the ${planId} plan. Welcome to the full Seevv experience!`);
-            navigate("/dashboard");
-          } catch (err) {
-            toast.error(`Payment received but upgrade failed: ${err.message}. Contact support.`);
-          } finally {
-            setLoadingPlan(null);
-          }
-        },
-        onCancel: () => {
+      if (result.flow === "popup") {
+        // Paystack inline popup
+        if (!paystackReady) {
+          toast.error("Payment system is loading, please try again in a moment.");
           setLoadingPlan(null);
-          toast.info("Payment cancelled.");
-        },
-      });
-
-      popup.openIframe();
+          return;
+        }
+        const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+        const popup = window.PaystackPop.setup({
+          key: publicKey,
+          email: user.email,
+          amount: PRICE_MAP[planId][currencyCode] * 100,
+          currency: currencyCode,
+          ref: result.reference,
+          access_code: result.access_code,
+          metadata: { planId, planKey },
+          onSuccess: async (txn) => {
+            try {
+              setLoadingPlan(planId);
+              await api.get(`/payments/verify/${txn.reference}`);
+              toast.success(`You're now on the ${planId} plan. Welcome to the full Seevv experience!`);
+              navigate("/dashboard");
+            } catch (err) {
+              toast.error(`Payment received but upgrade failed: ${err.message}. Contact support.`);
+            } finally {
+              setLoadingPlan(null);
+            }
+          },
+          onCancel: () => {
+            setLoadingPlan(null);
+            toast.info("Payment cancelled.");
+          },
+        });
+        popup.openIframe();
+      } else {
+        // Stripe / Flutterwave hosted checkout redirect
+        window.location.href = result.authorization_url;
+      }
     } catch (err) {
       toast.error(err.message || "Failed to start payment. Please try again.");
       setLoadingPlan(null);
@@ -359,6 +412,14 @@ const Pricing = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
+      {/* Payment verification overlay (redirect flow callback) */}
+      {verifying && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm gap-4">
+          <div className="w-12 h-12 rounded-full border-4 border-brand-600 border-t-transparent animate-spin" />
+          <p className="text-sm font-semibold text-gray-800">Verifying your payment…</p>
+          <p className="text-xs text-gray-400">Please don't close this tab</p>
+        </div>
+      )}
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-6 py-4 flex items-center gap-4">
         <button
@@ -413,6 +474,38 @@ const Pricing = () => {
           </p>
         )}
 
+        {/* Promo code */}
+        <div className="mb-6">
+          <button
+            onClick={() => setPromoOpen((p) => !p)}
+            className="text-xs text-brand-600 hover:text-brand-800 font-medium cursor-pointer transition-colors flex items-center gap-1 mx-auto"
+          >
+            Have a promo code?
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${promoOpen ? "rotate-180" : ""}`}>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          {promoOpen && (
+            <div className="mt-3 flex gap-2 max-w-sm mx-auto">
+              <input
+                type="text"
+                value={promoCode}
+                onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
+                placeholder="Enter promo code"
+                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-600"
+              />
+              <Button size="sm" variant="outline" onClick={validatePromo} isLoading={promoValidating} disabled={!promoCode.trim()}>
+                Apply
+              </Button>
+            </div>
+          )}
+          {promoResult?.valid && (
+            <p className="text-xs text-teal-600 font-medium text-center mt-2">
+              ✓ {promoResult.discountType === "percent" ? `${promoResult.discountValue}% off` : `${promoResult.discountValue} off`} — {promoResult.description}
+            </p>
+          )}
+        </div>
+
         {/* Plan grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
           {plans.map((plan) => (
@@ -428,12 +521,12 @@ const Pricing = () => {
           ))}
         </div>
 
-        {/* Paystack badge */}
+        {/* Gateway badge */}
         <div className="mt-8 flex flex-col items-center gap-2">
           <p className="text-xs text-gray-400">
             Payments secured by{" "}
-            <span className="font-semibold text-gray-600">Paystack</span>
-            {" "}· Card, bank transfer, USSD supported
+            <span className="font-semibold text-gray-600">Paystack · Stripe · Flutterwave</span>
+            {" "}· Card, bank transfer, and local payment methods supported
           </p>
           <p className="text-xs text-gray-300">
             Nigerian users pay in ₦ with no FX fees · Visa, Mastercard, Verve accepted

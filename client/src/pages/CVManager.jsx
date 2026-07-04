@@ -9,6 +9,72 @@ import { useAuthStore } from "@/store";
 import { supabase } from "@/lib/supabase";
 import api from "@/lib/api";
 
+// ─── Version diff modal ────────────────────────────────────────
+const CompareModal = ({ versions, ids, onClose }) => {
+  const [a, b] = ids.map((id) => versions.find((v) => v.id === id)).filter(Boolean);
+  if (!a || !b) return null;
+
+  const linesA = (a.raw_text || "").split("\n");
+  const linesB = (b.raw_text || "").split("\n");
+  const maxLen = Math.max(linesA.length, linesB.length);
+  const rows = Array.from({ length: maxLen }, (_, i) => ({
+    la: linesA[i] ?? "",
+    lb: linesB[i] ?? "",
+    diff: (linesA[i] ?? "") !== (linesB[i] ?? ""),
+  }));
+  const diffCount = rows.filter((r) => r.diff).length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-stretch bg-black/60 backdrop-blur-sm">
+      <div className="flex flex-col w-full h-full bg-white shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div className="flex items-center gap-4">
+            <p className="text-sm font-bold text-gray-900">Version comparison</p>
+            <span className="text-xs text-gray-400">{diffCount} line{diffCount !== 1 ? "s" : ""} differ</span>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 cursor-pointer p-1">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Column labels */}
+        <div className="grid grid-cols-2 gap-px bg-gray-100 shrink-0">
+          {[a, b].map((v, col) => (
+            <div key={col} className={`px-6 py-2.5 ${col === 0 ? "bg-red-50" : "bg-teal-50"}`}>
+              <p className="text-xs font-semibold text-gray-800 truncate">{v.file_name || (col === 0 ? "Version A" : "Version B")}</p>
+              <p className="text-[10px] text-gray-500">{new Date(v.created_at).toLocaleString()}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Diff body */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-px bg-gray-100">
+            {[
+              { lines: linesA, bg: "bg-red-50", textColor: "text-red-700" },
+              { lines: linesB, bg: "bg-teal-50", textColor: "text-teal-800" },
+            ].map(({ lines, bg, textColor }, col) => (
+              <div key={col} className="bg-white overflow-x-auto">
+                <div className="text-[11px] leading-5 font-mono">
+                  {rows.map((r, i) => (
+                    <div key={i} className={`px-4 py-px flex gap-2 ${r.diff ? `${bg} ${textColor}` : "text-gray-700"}`}>
+                      <span className="select-none text-gray-300 text-[9px] shrink-0 w-7 text-right">{i + 1}</span>
+                      <span className="whitespace-pre-wrap break-all">{(col === 0 ? r.la : r.lb) || " "}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CVManager = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -30,6 +96,16 @@ const CVManager = () => {
   const [isTailoring, setIsTailoring] = useState(false);
   const [tailoringTriggered, setTailoringTriggered] = useState(false);
   const [hasVoiceSample, setHasVoiceSample] = useState(null); // null = loading
+  const [compareIds, setCompareIds] = useState([]);
+  const [showCompare, setShowCompare] = useState(false);
+
+  const toggleCompare = (id) => {
+    setCompareIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 2) return [prev[1], id];
+      return [...prev, id];
+    });
+  };
 
   // Check if user has set a voice sample
   useEffect(() => {
@@ -159,6 +235,9 @@ const CVManager = () => {
 
   return (
     <div className="mx-auto space-y-6 pb-10">
+      {showCompare && compareIds.length === 2 && (
+        <CompareModal versions={cvVersions} ids={compareIds} onClose={() => setShowCompare(false)} />
+      )}
       {/* ── Voice mirroring nudge ─────────────────────── */}
       {hasVoiceSample === false && !isTailoring && masterCV && (
         <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -362,6 +441,26 @@ const CVManager = () => {
             </div>
           </div>
 
+          {/* Compare bar */}
+          {cvVersions.length >= 2 && (
+            <div className="flex items-center gap-3 mb-3 bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5">
+              <p className="text-xs text-gray-500 flex-1">
+                {compareIds.length === 0 && "Select 2 versions to compare side by side"}
+                {compareIds.length === 1 && "Select 1 more version to compare"}
+                {compareIds.length === 2 && "2 versions selected"}
+              </p>
+              {compareIds.length === 2 && (
+                <button
+                  onClick={() => setShowCompare(true)}
+                  className="text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-brand-100 transition-colors"
+                >Compare →</button>
+              )}
+              {compareIds.length > 0 && (
+                <button onClick={() => setCompareIds([])} className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">Clear</button>
+              )}
+            </div>
+          )}
+
           {cvVersions.length === 0 ? (
             <Card padding="none">
               <EmptyState
@@ -397,11 +496,21 @@ const CVManager = () => {
           ) : (
             <div className="grid gap-3">
               {cvVersions.map((version) => (
-                <CVVersionCard
-                  key={version.id}
-                  version={version}
-                  onDelete={handleDeleteVersion}
-                />
+                <div key={version.id} className="relative">
+                  <CVVersionCard
+                    version={version}
+                    onDelete={handleDeleteVersion}
+                  />
+                  <button
+                    onClick={() => toggleCompare(version.id)}
+                    title="Select for comparison"
+                    className={`absolute top-3 right-16 text-[10px] font-semibold px-2 py-1 rounded-full border cursor-pointer transition-colors ${
+                      compareIds.includes(version.id)
+                        ? "bg-brand-600 text-white border-brand-600"
+                        : "bg-white text-gray-400 border-gray-200 hover:border-brand-300 hover:text-brand-600"
+                    }`}
+                  >{compareIds.includes(version.id) ? "✓ Comparing" : "Compare"}</button>
+                </div>
               ))}
             </div>
           )}

@@ -40,19 +40,49 @@ const VoiceMirroringPage = () => {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [savedSample, setSavedSample] = useState(null);
+  const [savingToProfile, setSavingToProfile] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
 
   useEffect(() => {
     if (!user) return;
+    // Load CV versions + saved voice sample in parallel
     supabase
       .from("cv_versions")
-      .select(
-        "id, version_name, job_target:job_targets(job_title, company_name)",
-      )
+      .select("id, version_name, job_target:job_targets(job_title, company_name)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20)
       .then(({ data }) => setCvVersions(data || []));
+
+    supabase
+      .from("profiles")
+      .select("voice_sample")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.voice_sample) {
+          setSavedSample(data.voice_sample);
+          setVoiceSample(data.voice_sample);
+          setProfileSaved(true);
+        }
+      });
   }, [user]);
+
+  const handleSaveToProfile = async () => {
+    if (!voiceSample.trim() || !user) return;
+    setSavingToProfile(true);
+    try {
+      await supabase
+        .from("profiles")
+        .update({ voice_sample: voiceSample, updated_at: new Date().toISOString() })
+        .eq("id", user.id);
+      setSavedSample(voiceSample);
+      setProfileSaved(true);
+    } finally {
+      setSavingToProfile(false);
+    }
+  };
 
   const handleMirror = async () => {
     if (voiceSample.trim().length < 50)
@@ -90,26 +120,40 @@ const VoiceMirroringPage = () => {
       <Card padding="md">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">
-              Your writing sample
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-gray-700">
+                Your writing sample
+              </label>
+              {profileSaved && voiceSample === savedSample && (
+                <span className="text-[10px] text-teal-600 font-medium">✓ Saved to profile</span>
+              )}
+            </div>
             <p className="text-xs text-gray-400 mb-2">
               Paste anything you've written naturally — a LinkedIn post, email,
               personal statement, blog post. The more the better.
             </p>
             <textarea
               value={voiceSample}
-              onChange={(e) => setVoiceSample(e.target.value)}
+              onChange={(e) => { setVoiceSample(e.target.value); setProfileSaved(false); }}
               rows={5}
               placeholder="Paste 2–5 paragraphs of your own writing here…"
               className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-600 resize-none"
             />
-            <p
-              className={`text-[10px] mt-1 ${voiceSample.length < 50 ? "text-gray-300" : "text-teal-600"}`}
-            >
-              {voiceSample.length} characters{" "}
-              {voiceSample.length >= 50 ? "✓ Ready" : "(need 50+)"}
-            </p>
+            <div className="flex items-center justify-between mt-1">
+              <p className={`text-[10px] ${voiceSample.length < 50 ? "text-gray-300" : "text-teal-600"}`}>
+                {voiceSample.length} characters{" "}
+                {voiceSample.length >= 50 ? "✓ Ready" : "(need 50+)"}
+              </p>
+              {voiceSample.trim().length >= 50 && voiceSample !== savedSample && (
+                <button
+                  onClick={handleSaveToProfile}
+                  disabled={savingToProfile}
+                  className="text-[10px] font-semibold text-brand-600 hover:text-brand-800 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  {savingToProfile ? "Saving…" : "Save to profile →"}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Mode selector */}

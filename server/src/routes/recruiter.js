@@ -1,7 +1,8 @@
 import express from "express";
 import { supabase } from "../lib/supabase.js";
 import recruiterAuth from "../middleware/recruiterAuth.js";
-import { rankCandidates, extractSkillProfile } from "../lib/ai.js";
+import { rankCandidates, extractSkillProfile, calculateMatchScore } from "../lib/ai.js";
+import { getEmailProvider } from "../lib/emailProvider.js";
 
 const router = express.Router();
 router.use(recruiterAuth);
@@ -238,6 +239,99 @@ router.get("/platform-stats", async (req, res) => {
     });
   } catch (err) {
     console.error("Platform stats error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/recruiter/match-jd ────────────────────────
+// Score a single candidate against a job description
+router.post("/match-jd", async (req, res) => {
+  const { userId, jobDescription } = req.body;
+  if (!userId || !jobDescription) return res.status(400).json({ error: "userId and jobDescription required" });
+
+  try {
+    const { data: cv } = await supabase
+      .from("cvs")
+      .select("raw_text")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .single();
+
+    if (!cv?.raw_text) return res.status(404).json({ error: "No active CV found for this candidate" });
+
+    const result = await calculateMatchScore(cv.raw_text, jobDescription);
+    res.json(result);
+  } catch (err) {
+    console.error("Match JD error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/recruiter/bulk-outreach ───────────────────
+// Send a personalised message to multiple candidates
+router.post("/bulk-outreach", async (req, res) => {
+  const { candidateIds, subject, message } = req.body;
+  if (!candidateIds?.length || !subject || !message)
+    return res.status(400).json({ error: "candidateIds, subject, and message required" });
+  if (candidateIds.length > 50)
+    return res.status(400).json({ error: "Max 50 candidates per outreach batch" });
+
+  try {
+    const { data: profiles, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("id", candidateIds);
+
+    if (error) throw error;
+
+    const emailProvider = await getEmailProvider();
+    const results = { sent: 0, failed: 0, errors: [] };
+
+    for (const profile of profiles || []) {
+      if (!profile.email) { results.failed++; continue; }
+
+      const personalised = message
+        .replace(/\{\{name\}\}/gi, profile.full_name || "there")
+        .replace(/\{\{first_name\}\}/gi, (profile.full_name || "there").split(" ")[0]);
+
+      try {
+        await emailProvider.send({
+          to: profile.email,
+          subject,
+          html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">${personalised.replace(/\n/g, "<br>")}</div>`,
+          text: personalised,
+        });
+        results.sent++;
+      } catch (err) {
+        results.failed++;
+        results.errors.push({ id: profile.id, error: err.message });
+      }
+    }
+
+    res.json(results);
+  } catch (err) {
+    console.error("Bulk outreach error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/recruiter/flag-candidate ───────────────────
+// Submit a moderation flag on a candidate profile
+router.post("/flag-candidate", async (req, res) => {
+  const { candidateId, reason, details } = req.body;
+  if (!candidateId || !reason) return res.status(400).json({ error: "candidateId and reason required" });
+
+  try {
+    const { error } = await supabase.from("moderation_flags").insert({
+      content_type: "profile",
+      content_id: candidateId,
+      reporter_id: req.user.id,
+      reason,
+      status: "pending",
+    });
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

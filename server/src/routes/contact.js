@@ -1,8 +1,7 @@
 import express from "express";
-import { Resend } from "resend";
+import { getEmailProvider } from "../lib/emailProvider.js";
 
 const router = express.Router();
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 router.post("/", async (req, res) => {
   const { name, email, subject, message } = req.body;
@@ -12,10 +11,11 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    await resend.emails.send({
+    const provider = await getEmailProvider();
+    await provider.send({
       from: "Seevv Contact <onboarding@resend.dev>",
       to: "helloemediahome@gmail.com",
-      reply_to: email,
+      replyTo: email,
       subject: subject ? `[Seevv] ${subject}` : `[Seevv] New message from ${name}`,
       html: `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
