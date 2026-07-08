@@ -404,9 +404,10 @@ router.delete("/ai-settings/key/:provider", async (req, res) => {
   const { provider } = req.params;
   if (!PROVIDER_REGISTRY[provider]) return res.status(400).json({ error: "Unknown provider" });
   try {
-    await deleteApiKey(PROVIDER_REGISTRY[provider].dbKey);
+    const registry = PROVIDER_REGISTRY[provider];
+    await deleteApiKey(registry.dbKey);
     invalidateCache();
-    res.json({ ok: true });
+    res.json({ ok: true, envFallback: !!process.env[registry.envKey] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -484,9 +485,10 @@ router.delete("/payment-settings/key/:gateway", async (req, res) => {
   const { gateway } = req.params;
   if (!PAYMENT_REGISTRY[gateway]) return res.status(400).json({ error: "Unknown gateway" });
   try {
-    await deleteApiKey(PAYMENT_REGISTRY[gateway].dbKey);
+    const registry = PAYMENT_REGISTRY[gateway];
+    await deleteApiKey(registry.dbKey);
     invalidatePaymentCache();
-    res.json({ ok: true });
+    res.json({ ok: true, envFallback: !!process.env[registry.envKey] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -597,9 +599,10 @@ router.delete("/integrations/email/key/:provider", async (req, res) => {
   const { provider } = req.params;
   if (!EMAIL_REGISTRY[provider]) return res.status(400).json({ error: "Unknown email provider" });
   try {
-    await deleteApiKey(EMAIL_REGISTRY[provider].dbKey);
+    const registry = EMAIL_REGISTRY[provider];
+    await deleteApiKey(registry.dbKey);
     invalidateEmailCache();
-    res.json({ ok: true });
+    res.json({ ok: true, envFallback: !!process.env[registry.envKey] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -609,7 +612,7 @@ router.delete("/integrations/email/key/:provider", async (req, res) => {
 router.delete("/integrations/sentry/key", async (req, res) => {
   try {
     await deleteApiKey("sentry_dsn");
-    res.json({ ok: true });
+    res.json({ ok: true, envFallback: !!process.env.SENTRY_DSN });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

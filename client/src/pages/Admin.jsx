@@ -649,14 +649,23 @@ const AISettingsPanel = () => {
 
   const deleteProviderKey = async (provider) => {
     setError(null);
-    await api.delete(`/admin/ai-settings/key/${provider}`);
-    setSettings((prev) => ({
-      ...prev,
-      providers: {
-        ...prev.providers,
-        [provider]: { ...prev.providers[provider], configured: false, keyPreview: null },
-      },
-    }));
+    try {
+      const result = await api.delete(`/admin/ai-settings/key/${provider}`);
+      if (result.envFallback) {
+        const envVar = `${provider.toUpperCase()}_API_KEY`;
+        setError(`DB key removed, but ${envVar} is still set as a server environment variable — remove it from Render's dashboard to fully disable this provider.`);
+      }
+      setSettings((prev) => ({
+        ...prev,
+        providers: {
+          ...prev.providers,
+          [provider]: { ...prev.providers[provider], configured: result.envFallback, keyPreview: result.envFallback ? prev.providers[provider].keyPreview : null },
+        },
+      }));
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
   };
 
   if (loading) return <div className="flex justify-center py-16"><img src="/favicon.png" alt="Loading" className="w-10 h-10 animate-pulse" /></div>;
@@ -974,14 +983,23 @@ const PaymentSettingsPanel = () => {
 
   const deleteGatewayKey = async (gateway) => {
     setError(null);
-    await api.delete(`/admin/payment-settings/key/${gateway}`);
-    setSettings((prev) => ({
-      ...prev,
-      gateways: {
-        ...prev.gateways,
-        [gateway]: { ...prev.gateways[gateway], configured: false, keyPreview: null },
-      },
-    }));
+    try {
+      const result = await api.delete(`/admin/payment-settings/key/${gateway}`);
+      if (result.envFallback) {
+        const envVar = `${gateway.toUpperCase()}_SECRET_KEY`;
+        setError(`DB key removed, but ${envVar} is still set as a server environment variable — remove it from Render's dashboard to fully disable this gateway.`);
+      }
+      setSettings((prev) => ({
+        ...prev,
+        gateways: {
+          ...prev.gateways,
+          [gateway]: { ...prev.gateways[gateway], configured: result.envFallback, keyPreview: result.envFallback ? prev.gateways[gateway].keyPreview : null },
+        },
+      }));
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
   };
 
   if (loading) return <div className="flex justify-center py-16"><img src="/favicon.png" alt="" className="w-10 h-10 animate-pulse" /></div>;
@@ -1070,17 +1088,26 @@ const IntegrationsPanel = () => {
 
   const deleteEmailKey = async (provider) => {
     setError(null);
-    await api.delete(`/admin/integrations/email/key/${provider}`);
-    setData((prev) => ({
-      ...prev,
-      email: {
-        ...prev.email,
-        providers: {
-          ...prev.email.providers,
-          [provider]: { ...prev.email.providers[provider], configured: false, keyPreview: null },
+    try {
+      const result = await api.delete(`/admin/integrations/email/key/${provider}`);
+      if (result.envFallback) {
+        const envVar = `${provider.toUpperCase()}_API_KEY`;
+        setError(`DB key removed, but ${envVar} is still set as a server environment variable — remove it from Render's dashboard to fully disable this provider.`);
+      }
+      setData((prev) => ({
+        ...prev,
+        email: {
+          ...prev.email,
+          providers: {
+            ...prev.email.providers,
+            [provider]: { ...prev.email.providers[provider], configured: result.envFallback, keyPreview: result.envFallback ? prev.email.providers[provider].keyPreview : null },
+          },
         },
-      },
-    }));
+      }));
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
   };
 
   const saveSentryKey = async (key) => {
@@ -1091,8 +1118,16 @@ const IntegrationsPanel = () => {
 
   const deleteSentryKey = async () => {
     setError(null);
-    await api.delete("/admin/integrations/sentry/key");
-    setData((prev) => ({ ...prev, sentry: { ...prev.sentry, configured: false } }));
+    try {
+      const result = await api.delete("/admin/integrations/sentry/key");
+      if (result.envFallback) {
+        setError("DB key removed, but SENTRY_DSN is still set as a server environment variable — remove it from Render's dashboard to fully disable Sentry.");
+      }
+      setData((prev) => ({ ...prev, sentry: { ...prev.sentry, configured: result.envFallback } }));
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
   };
 
   const saveFromEmail = async (from) => {
