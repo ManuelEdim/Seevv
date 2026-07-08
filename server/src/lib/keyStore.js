@@ -45,6 +45,12 @@ export function invalidateKeyCache(dbKey) {
   else keyCache.clear();
 }
 
+/** Delete a key from app_settings and evict the cache entry. */
+export async function deleteApiKey(dbKey) {
+  await supabase.from("app_settings").delete().eq("key", dbKey);
+  keyCache.delete(dbKey);
+}
+
 /** Returns the last-4 preview string, or null if no key is stored. */
 export function maskKey(key) {
   if (!key) return null;

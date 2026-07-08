@@ -6,7 +6,7 @@ import { FEATURES, PLAN_HIERARCHY } from "../lib/features.js";
 import { PROVIDER_REGISTRY, getProviderStatus, invalidateCache, getActiveProviderName, isAIEnabled } from "../lib/aiProvider.js";
 import { PAYMENT_REGISTRY, getPaymentGatewayStatus, invalidatePaymentCache, getActiveGatewayName, isPaymentEnabled } from "../lib/paymentProvider.js";
 import { EMAIL_REGISTRY, getEmailProviderStatus, invalidateEmailCache, getActiveEmailProviderName, isEmailEnabled } from "../lib/emailProvider.js";
-import { getApiKey, saveApiKey, invalidateKeyCache, maskKey } from "../lib/keyStore.js";
+import { getApiKey, saveApiKey, invalidateKeyCache, maskKey, deleteApiKey } from "../lib/keyStore.js";
 import { sendVerificationApproved, sendVerificationRejected } from "../lib/emailService.js";
 
 const router = express.Router();
@@ -399,6 +399,19 @@ router.put("/ai-settings/key", async (req, res) => {
   res.json({ configured: true, keyPreview: maskKey(key.trim()) });
 });
 
+// ─── DELETE /api/admin/ai-settings/key/:provider ──────────
+router.delete("/ai-settings/key/:provider", async (req, res) => {
+  const { provider } = req.params;
+  if (!PROVIDER_REGISTRY[provider]) return res.status(400).json({ error: "Unknown provider" });
+  try {
+    await deleteApiKey(PROVIDER_REGISTRY[provider].dbKey);
+    invalidateCache();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/admin/payment-settings ───────────────────────
 router.get("/payment-settings", async (req, res) => {
   try {
@@ -464,6 +477,19 @@ router.put("/payment-settings/key", async (req, res) => {
   invalidatePaymentCache();
 
   res.json({ configured: true, keyPreview: maskKey(key.trim()) });
+});
+
+// ─── DELETE /api/admin/payment-settings/key/:gateway ──────
+router.delete("/payment-settings/key/:gateway", async (req, res) => {
+  const { gateway } = req.params;
+  if (!PAYMENT_REGISTRY[gateway]) return res.status(400).json({ error: "Unknown gateway" });
+  try {
+    await deleteApiKey(PAYMENT_REGISTRY[gateway].dbKey);
+    invalidatePaymentCache();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── GET /api/admin/integrations ───────────────────────────
@@ -564,6 +590,53 @@ router.put("/integrations/sentry/key", async (req, res) => {
   invalidateKeyCache("sentry_dsn");
 
   res.json({ configured: true });
+});
+
+// ─── DELETE /api/admin/integrations/email/key/:provider ───
+router.delete("/integrations/email/key/:provider", async (req, res) => {
+  const { provider } = req.params;
+  if (!EMAIL_REGISTRY[provider]) return res.status(400).json({ error: "Unknown email provider" });
+  try {
+    await deleteApiKey(EMAIL_REGISTRY[provider].dbKey);
+    invalidateEmailCache();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── DELETE /api/admin/integrations/sentry/key ────────────
+router.delete("/integrations/sentry/key", async (req, res) => {
+  try {
+    await deleteApiKey("sentry_dsn");
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── DELETE /api/admin/settings/key/:dbKey ────────────────
+// Remove a stored API key from app_settings entirely.
+// The ALLOWED_KEYS whitelist prevents callers from wiping arbitrary rows.
+const ALLOWED_DELETE_KEYS = new Set([
+  ...Object.values(PROVIDER_REGISTRY).map((r) => r.dbKey),
+  ...Object.values(PAYMENT_REGISTRY).map((r) => r.dbKey),
+  ...Object.values(EMAIL_REGISTRY).map((r) => r.dbKey),
+  "notify_from_email",
+  "sentry_dsn",
+]);
+
+router.delete("/settings/key/:dbKey", async (req, res) => {
+  const { dbKey } = req.params;
+  if (!ALLOWED_DELETE_KEYS.has(dbKey)) {
+    return res.status(400).json({ error: "Unknown or non-deletable key" });
+  }
+  try {
+    await deleteApiKey(dbKey);
+    res.json({ ok: true, dbKey });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── GET /api/admin/audit-logs ────────────────────────────

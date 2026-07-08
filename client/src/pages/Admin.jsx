@@ -647,6 +647,18 @@ const AISettingsPanel = () => {
     }));
   };
 
+  const deleteProviderKey = async (provider) => {
+    setError(null);
+    await api.delete(`/admin/ai-settings/key/${provider}`);
+    setSettings((prev) => ({
+      ...prev,
+      providers: {
+        ...prev.providers,
+        [provider]: { ...prev.providers[provider], configured: false, keyPreview: null },
+      },
+    }));
+  };
+
   if (loading) return <div className="flex justify-center py-16"><img src="/favicon.png" alt="Loading" className="w-10 h-10 animate-pulse" /></div>;
 
   const providers = settings?.providers || {};
@@ -699,6 +711,7 @@ const AISettingsPanel = () => {
               isActive={settings?.activeProvider === id}
               onActivate={handleProviderChange}
               onSaveKey={saveProviderKey}
+              onDeleteKey={deleteProviderKey}
               saving={saving}
             />
           ))}
@@ -715,10 +728,11 @@ const AISettingsPanel = () => {
 };
 
 // ─── AI provider card (mirrors GatewayCard but shows models) ─
-const AIProviderCard = ({ id, info, isActive, onActivate, onSaveKey, saving }) => {
+const AIProviderCard = ({ id, info, isActive, onActivate, onSaveKey, onDeleteKey, saving }) => {
   const [keyInput, setKeyInput]       = useState("");
   const [showKeyForm, setShowKeyForm] = useState(!info.keyPreview);
   const [keySaving, setKeySaving]     = useState(false);
+  const [keyDeleting, setKeyDeleting] = useState(false);
 
   const handleSave = async (e) => {
     e.stopPropagation();
@@ -730,6 +744,18 @@ const AIProviderCard = ({ id, info, isActive, onActivate, onSaveKey, saving }) =
       setShowKeyForm(false);
     } finally {
       setKeySaving(false);
+    }
+  };
+
+  const handleDelete = async (e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Remove the ${info.label} API key? The provider will become unavailable until a new key is added.`)) return;
+    setKeyDeleting(true);
+    try {
+      await onDeleteKey(id);
+      setShowKeyForm(true);
+    } finally {
+      setKeyDeleting(false);
     }
   };
 
@@ -765,7 +791,12 @@ const AIProviderCard = ({ id, info, isActive, onActivate, onSaveKey, saving }) =
         {info.keyPreview && !showKeyForm ? (
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-teal-600 font-mono font-medium">Key: {info.keyPreview}</span>
-            <button onClick={() => setShowKeyForm(true)} className="text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer">Update</button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setShowKeyForm(true)} className="text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer">Update</button>
+              <button onClick={handleDelete} disabled={keyDeleting} className="text-[11px] text-red-400 hover:text-red-600 cursor-pointer disabled:opacity-40">
+                {keyDeleting ? "…" : "Delete"}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex gap-1.5">
@@ -804,10 +835,11 @@ const Toggle = ({ on, onClick, disabled }) => (
   </button>
 );
 
-const GatewayCard = ({ id, info, isActive, onActivate, onSaveKey, saving }) => {
+const GatewayCard = ({ id, info, isActive, onActivate, onSaveKey, onDeleteKey, saving }) => {
   const [keyInput, setKeyInput]       = useState("");
   const [showKeyForm, setShowKeyForm] = useState(!info.keyPreview);
   const [keySaving, setKeySaving]     = useState(false);
+  const [keyDeleting, setKeyDeleting] = useState(false);
 
   const handleSave = async (e) => {
     e.stopPropagation();
@@ -819,6 +851,18 @@ const GatewayCard = ({ id, info, isActive, onActivate, onSaveKey, saving }) => {
       setShowKeyForm(false);
     } finally {
       setKeySaving(false);
+    }
+  };
+
+  const handleDelete = async (e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Remove the ${info.label} API key? The gateway will become unavailable until a new key is added.`)) return;
+    setKeyDeleting(true);
+    try {
+      await onDeleteKey(id);
+      setShowKeyForm(true);
+    } finally {
+      setKeyDeleting(false);
     }
   };
 
@@ -857,7 +901,12 @@ const GatewayCard = ({ id, info, isActive, onActivate, onSaveKey, saving }) => {
         {info.keyPreview && !showKeyForm ? (
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-teal-600 font-mono font-medium">Key: {info.keyPreview}</span>
-            <button onClick={() => setShowKeyForm(true)} className="text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer">Update</button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setShowKeyForm(true)} className="text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer">Update</button>
+              <button onClick={handleDelete} disabled={keyDeleting} className="text-[11px] text-red-400 hover:text-red-600 cursor-pointer disabled:opacity-40">
+                {keyDeleting ? "…" : "Delete"}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex gap-1.5">
@@ -923,6 +972,18 @@ const PaymentSettingsPanel = () => {
     }));
   };
 
+  const deleteGatewayKey = async (gateway) => {
+    setError(null);
+    await api.delete(`/admin/payment-settings/key/${gateway}`);
+    setSettings((prev) => ({
+      ...prev,
+      gateways: {
+        ...prev.gateways,
+        [gateway]: { ...prev.gateways[gateway], configured: false, keyPreview: null },
+      },
+    }));
+  };
+
   if (loading) return <div className="flex justify-center py-16"><img src="/favicon.png" alt="" className="w-10 h-10 animate-pulse" /></div>;
 
   return (
@@ -956,7 +1017,7 @@ const PaymentSettingsPanel = () => {
         <p className="text-xs text-gray-400 mb-4">Paste each gateway's secret key below, then click a card to set it as active.</p>
         <div className="grid sm:grid-cols-3 gap-3">
           {Object.entries(settings?.gateways || {}).map(([id, info]) => (
-            <GatewayCard key={id} id={id} info={info} isActive={settings?.activeGateway === id} onActivate={activate} onSaveKey={saveGatewayKey} saving={saving} />
+            <GatewayCard key={id} id={id} info={info} isActive={settings?.activeGateway === id} onActivate={activate} onSaveKey={saveGatewayKey} onDeleteKey={deleteGatewayKey} saving={saving} />
           ))}
         </div>
         <div className="mt-4 pt-4 border-t border-gray-50 grid sm:grid-cols-3 gap-3 text-[11px] text-gray-400">
@@ -1007,10 +1068,31 @@ const IntegrationsPanel = () => {
     }));
   };
 
+  const deleteEmailKey = async (provider) => {
+    setError(null);
+    await api.delete(`/admin/integrations/email/key/${provider}`);
+    setData((prev) => ({
+      ...prev,
+      email: {
+        ...prev.email,
+        providers: {
+          ...prev.email.providers,
+          [provider]: { ...prev.email.providers[provider], configured: false, keyPreview: null },
+        },
+      },
+    }));
+  };
+
   const saveSentryKey = async (key) => {
     setError(null);
     await api.put("/admin/integrations/sentry/key", { key });
     setData((prev) => ({ ...prev, sentry: { ...prev.sentry, configured: true } }));
+  };
+
+  const deleteSentryKey = async () => {
+    setError(null);
+    await api.delete("/admin/integrations/sentry/key");
+    setData((prev) => ({ ...prev, sentry: { ...prev.sentry, configured: false } }));
   };
 
   const saveFromEmail = async (from) => {
@@ -1049,6 +1131,7 @@ const IntegrationsPanel = () => {
               isActive={email.activeProvider === id}
               onActivate={(p) => updateEmail({ provider: p })}
               onSaveKey={saveEmailKey}
+              onDeleteKey={deleteEmailKey}
               saving={saving}
             />
           ))}
@@ -1079,7 +1162,7 @@ const IntegrationsPanel = () => {
             {sentry.configured ? "Active" : "Not configured"}
           </span>
         </div>
-        <SentryKeyInput configured={sentry.configured} onSave={saveSentryKey} />
+        <SentryKeyInput configured={sentry.configured} onSave={saveSentryKey} onDelete={deleteSentryKey} />
         <p className="text-[11px] text-gray-400 mt-2">sentry.io → your Node.js project → Settings → Client Keys → DSN</p>
       </div>
     </div>
@@ -1124,10 +1207,11 @@ const FromEmailInput = ({ value, onSave }) => {
 };
 
 // ─── Sentry key input ──────────────────────────────────────
-const SentryKeyInput = ({ configured, onSave }) => {
+const SentryKeyInput = ({ configured, onSave, onDelete }) => {
   const [keyInput, setKeyInput]       = useState("");
   const [showForm, setShowForm]       = useState(!configured);
   const [saving, setSaving]           = useState(false);
+  const [deleting, setDeleting]       = useState(false);
 
   const handleSave = async () => {
     if (!keyInput.trim()) return;
@@ -1136,11 +1220,21 @@ const SentryKeyInput = ({ configured, onSave }) => {
     finally { setSaving(false); }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm("Remove the Sentry DSN? Error tracking will be disabled.")) return;
+    setDeleting(true);
+    try { await onDelete(); setShowForm(true); }
+    finally { setDeleting(false); }
+  };
+
   if (configured && !showForm) {
     return (
       <div className="flex items-center gap-3 mt-1">
         <span className="text-[11px] text-teal-600 font-mono font-medium">DSN configured</span>
         <button onClick={() => setShowForm(true)} className="text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer">Update</button>
+        <button onClick={handleDelete} disabled={deleting} className="text-[11px] text-red-400 hover:text-red-600 cursor-pointer disabled:opacity-40">
+          {deleting ? "…" : "Delete"}
+        </button>
       </div>
     );
   }
