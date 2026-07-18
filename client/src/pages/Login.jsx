@@ -218,9 +218,9 @@ const Login = () => {
 
           <p className="mt-8 text-xs text-gray-400 text-center">
             By continuing, you agree to Seevv's{" "}
-            <span className="text-brand-600 cursor-pointer">Terms of Service</span>{" "}
+            <Link to="/terms" className="text-brand-600 hover:text-brand-800">Terms of Service</Link>{" "}
             and{" "}
-            <span className="text-brand-600 cursor-pointer">Privacy Policy</span>
+            <Link to="/privacy" className="text-brand-600 hover:text-brand-800">Privacy Policy</Link>
           </p>
         </div>
       </div>

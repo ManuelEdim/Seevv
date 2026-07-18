@@ -44,6 +44,8 @@ import RecruiterOutreach from "@/pages/RecruiterOutreach";
 import ApplyAssist from "@/pages/ApplyAssist";
 import CvShareReview from "@/pages/CvShareReview";
 import Journal from "@/pages/Journal";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 
 const App = () => {
   const { isLoading } = useAuth();
@@ -87,6 +89,8 @@ const App = () => {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
 
         {/* Protected routes — wrapped in AppLayout */}

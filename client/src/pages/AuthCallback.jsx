@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store";
 import { Spinner } from "@/components/ui";
@@ -12,6 +12,7 @@ const steps = [
 
 const AuthCallback = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const login = useAuthStore((state) => state.login);
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState(null);
@@ -24,6 +25,15 @@ const AuthCallback = () => {
 
     const handleCallback = async () => {
       try {
+        // Check if this is a password recovery redirect
+        const type = searchParams.get("type");
+        const hashType = new URLSearchParams(window.location.hash.substring(1)).get("type");
+        if (type === "recovery" || hashType === "recovery") {
+          clearInterval(interval);
+          navigate("/reset-password", { replace: true });
+          return;
+        }
+
         const {
           data: { session },
           error,

@@ -322,6 +322,7 @@ const Profile = () => {
   }
 
   const plan = planConfig[profile?.plan] || planConfig.free;
+  const isGoogleUser = user?.app_metadata?.provider === "google" || user?.identities?.some((id) => id.provider === "google");
 
   const initials = profile?.full_name
     ? profile.full_name
@@ -750,38 +751,52 @@ const Profile = () => {
 
       {/* ── Change password + Account — side by side on desktop ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <Section
-          title="Change password"
-          description="Min 8 characters with uppercase, lowercase, and a number"
-        >
-          <form
-            onSubmit={handlePasswordSubmit(onPasswordSave)}
-            className="space-y-4"
+        {isGoogleUser ? (
+          <Section
+            title="Password"
+            description="You signed in with Google — no password to manage here"
           >
-            <Input
-              label="New password"
-              type="password"
-              placeholder="••••••••"
-              error={passwordErrors.newPassword?.message}
-              {...registerPassword("newPassword")}
-            />
-            <Input
-              label="Confirm new password"
-              type="password"
-              placeholder="••••••••"
-              error={passwordErrors.confirmPassword?.message}
-              {...registerPassword("confirmPassword")}
-            />
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              isLoading={passwordSubmitting}
+            <div className="flex items-center gap-3 py-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <p className="text-sm text-gray-400">Managed by Google</p>
+            </div>
+          </Section>
+        ) : (
+          <Section
+            title="Change password"
+            description="Min 8 characters with uppercase, lowercase, and a number"
+          >
+            <form
+              onSubmit={handlePasswordSubmit(onPasswordSave)}
+              className="space-y-4"
             >
-              Update password
-            </Button>
-          </form>
-        </Section>
+              <Input
+                label="New password"
+                type="password"
+                placeholder="••••••••"
+                error={passwordErrors.newPassword?.message}
+                {...registerPassword("newPassword")}
+              />
+              <Input
+                label="Confirm new password"
+                type="password"
+                placeholder="••••••••"
+                error={passwordErrors.confirmPassword?.message}
+                {...registerPassword("confirmPassword")}
+              />
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                isLoading={passwordSubmitting}
+              >
+                Update password
+              </Button>
+            </form>
+          </Section>
+        )}
 
         <Section title="Account" description="Manage your session and account">
           <div className="space-y-3">
