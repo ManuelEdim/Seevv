@@ -2,6 +2,7 @@ import { Router } from "express";
 import authMiddleware from "../middleware/auth.js";
 import { parseJobDescription } from "../lib/ai.js";
 import { supabase } from "../lib/supabase.js";
+import { getProvider } from "../lib/aiProvider.js";
 
 const router = Router();
 
@@ -212,6 +213,37 @@ router.post("/parse-jd", async (req, res) => {
   } catch (err) {
     console.error("parse-jd error:", err.message);
     res.status(500).json({ error: "Failed to parse job description" });
+  }
+});
+
+// POST /api/jobs/search-descriptions — AI generates realistic JD options for a typed/spoken job title
+router.post("/search-descriptions", async (req, res) => {
+  const { title, company } = req.body;
+  if (!title?.trim()) return res.status(400).json({ error: "title is required" });
+
+  try {
+    const provider = await getProvider();
+    const companyHint = company?.trim() ? ` at ${company.trim()}` : "";
+    const prompt = `Generate 3 realistic, detailed job descriptions for the role "${title.trim()}"${companyHint}.
+
+Each description should have a slightly different emphasis:
+1. Technical / hands-on focus
+2. Leadership / stakeholder focus
+3. Growth / strategic focus
+
+Return ONLY a valid JSON array (no markdown, no preamble) with this structure:
+[
+  { "label": "string (3–5 word descriptor)", "description": "full job description text including About the Role, Key Responsibilities (8+ bullets), Requirements (6+ bullets), and What We Offer (3 bullets)" },
+  ...
+]`;
+
+    const raw = await provider.generate(prompt, { maxTokens: 2500 });
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return res.status(500).json({ error: "AI returned an unexpected format" });
+    const descriptions = JSON.parse(jsonMatch[0]);
+    res.json({ descriptions: descriptions.slice(0, 3) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

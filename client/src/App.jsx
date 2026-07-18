@@ -43,6 +43,7 @@ import NegotiationCoach from "@/pages/NegotiationCoach";
 import RecruiterOutreach from "@/pages/RecruiterOutreach";
 import ApplyAssist from "@/pages/ApplyAssist";
 import CvShareReview from "@/pages/CvShareReview";
+import Journal from "@/pages/Journal";
 
 const App = () => {
   const { isLoading } = useAuth();
@@ -145,6 +146,17 @@ const App = () => {
             <ProtectedRoute>
               <AppLayout>
                 <Profile />
+              </AppLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/journal"
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Journal />
               </AppLayout>
             </ProtectedRoute>
           }
