@@ -11,9 +11,10 @@ const MatchScoreRing = ({ score = 0, size = "md" }) => {
   const offset = circumference - (score / 100) * circumference;
 
   const color = score >= 80 ? "#1D9E75" : score >= 60 ? "#EF9F27" : "#D85A30";
+  const notScored = score === 0;
 
   return (
-    <div className="relative inline-flex items-center justify-center">
+    <div className="relative inline-flex items-center justify-center" title={notScored ? "Decode this job to get a match score" : `${score}% match`}>
       <svg width={diameter} height={diameter} className="-rotate-90">
         {/* Background ring */}
         <circle
@@ -24,23 +25,25 @@ const MatchScoreRing = ({ score = 0, size = "md" }) => {
           stroke="#F1EFE8"
           strokeWidth={stroke}
         />
-        {/* Score ring */}
-        <circle
-          cx={diameter / 2}
-          cy={diameter / 2}
-          r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth={stroke}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          className="transition-all duration-700"
-        />
+        {/* Score ring — hidden when not scored */}
+        {!notScored && (
+          <circle
+            cx={diameter / 2}
+            cy={diameter / 2}
+            r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="transition-all duration-700"
+          />
+        )}
       </svg>
       {/* Score text */}
-      <span className={`absolute font-semibold ${fontSize}`} style={{ color }}>
-        {score}%
+      <span className={`absolute font-semibold ${fontSize}`} style={{ color: notScored ? "#9ca3af" : color }}>
+        {notScored ? "—" : `${score}%`}
       </span>
     </div>
   );

@@ -52,6 +52,7 @@ const JobTargetCard = ({ job, onStatusChange, onDelete }) => {
   const [currentStatus, setCurrentStatus] = useState(job.status || "saved");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const dropdownRef = useRef(null);
 
   const priority = priorityConfig[job.priority] || priorityConfig.medium;
@@ -226,15 +227,31 @@ const JobTargetCard = ({ job, onStatusChange, onDelete }) => {
           {onDelete && (
             <>
               <span className="text-gray-200">·</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(job.id);
-                }}
-                className="text-xs text-gray-400 hover:text-coral-600 cursor-pointer transition-colors"
-              >
-                Delete
-              </button>
+              {confirmDelete ? (
+                <span className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <span className="text-xs text-coral-600 font-medium">Remove?</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(job.id); }}
+                    className="text-xs text-coral-600 font-semibold hover:text-coral-700 cursor-pointer transition-colors"
+                  >
+                    Yes
+                  </button>
+                  <span className="text-gray-200">/</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}
+                    className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
+                  >
+                    No
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+                  className="text-xs text-gray-400 hover:text-coral-600 cursor-pointer transition-colors"
+                >
+                  Delete
+                </button>
+              )}
             </>
           )}
         </div>

@@ -518,6 +518,88 @@ const FeatureGrid = ({ plan, overrides, navigate }) => {
   );
 };
 
+// ─── Smart next-action banner ──────────────────────────────
+
+const NEXT_ACTIONS = [
+  {
+    id: "upload_cv",
+    check: ({ cvVersions }) => cvVersions === 0,
+    color: "from-brand-600 to-brand-700",
+    bg: "bg-brand-50",
+    border: "border-brand-100",
+    text: "text-brand-700",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+        <line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 11 15 14"/>
+      </svg>
+    ),
+    label: "Step 1 — Upload your CV",
+    desc: "Seevv needs your CV to tailor it for each role. Upload yours to unlock everything.",
+    cta: "Upload my CV",
+    path: "/cv",
+  },
+  {
+    id: "add_job",
+    check: ({ cvVersions, jobTargets }) => cvVersions > 0 && jobTargets.length === 0,
+    color: "from-teal-600 to-teal-700",
+    bg: "bg-teal-50",
+    border: "border-teal-100",
+    text: "text-teal-700",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+    ),
+    label: "Step 2 — Add a job target",
+    desc: "Tell Seevv what role you're going for. Type or say the job title and pick from real descriptions.",
+    cta: "Add a role",
+    path: null,
+  },
+  {
+    id: "decode_jd",
+    check: ({ cvVersions, jobTargets }) =>
+      cvVersions > 0 && jobTargets.length > 0 && !jobTargets.some((j) => j.match_score > 0),
+    color: "from-amber-500 to-amber-600",
+    bg: "bg-amber-50",
+    border: "border-amber-100",
+    text: "text-amber-700",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+    ),
+    label: "Step 3 — Decode the job description",
+    desc: "Deep Decoder finds hidden keywords and culture signals, then scores how well you match.",
+    cta: "Decode now",
+    path: "/decoder",
+  },
+];
+
+const NextActionBanner = ({ metrics, jobTargets, onAddJob, navigate }) => {
+  const ctx = { cvVersions: metrics.cvVersions, jobTargets };
+  const action = NEXT_ACTIONS.find((a) => a.check(ctx));
+  if (!action) return null;
+
+  return (
+    <div className={`rounded-2xl border ${action.border} ${action.bg} p-4 mb-6 flex items-center gap-4`}>
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br ${action.color} text-white`}>
+        {action.icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-xs font-bold uppercase tracking-wide ${action.text} mb-0.5`}>{action.label}</p>
+        <p className="text-xs text-gray-500 leading-snug">{action.desc}</p>
+      </div>
+      <button
+        onClick={() => action.path ? navigate(action.path) : onAddJob()}
+        className={`shrink-0 text-xs font-semibold px-4 py-2 rounded-xl border ${action.border} ${action.text} ${action.bg} hover:opacity-80 transition-opacity cursor-pointer whitespace-nowrap`}
+      >
+        {action.cta} →
+      </button>
+    </div>
+  );
+};
+
 // ─── Hero banner ───────────────────────────────────────────
 
 const HeroBanner = ({ name, plan, metrics, onAddJob }) => {
@@ -632,7 +714,6 @@ const Dashboard = () => {
   const fullName = user?.user_metadata?.full_name || profile?.full_name || "";
 
   const handleDeleteJob = async (jobId) => {
-    if (!window.confirm("Delete this role? This cannot be undone.")) return;
     const { error } = await supabase
       .from("job_targets")
       .delete()
@@ -702,10 +783,18 @@ const Dashboard = () => {
         onAddJob={() => setIsAddJobOpen(true)}
       />
 
+      {/* Smart next-action prompt */}
+      <NextActionBanner
+        metrics={metrics}
+        jobTargets={jobTargets}
+        onAddJob={() => setIsAddJobOpen(true)}
+        navigate={navigate}
+      />
+
       {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-8">
         <MetricCard label="Applications"     value={metrics.totalApplications}                                    sub="roles applied to"    color="brand" />
-        <MetricCard label="Avg match score"  value={metrics.avgMatchScore > 0 ? `${metrics.avgMatchScore}%` : "—"} sub="across all versions"  color="teal" />
+        <MetricCard label="Avg match score"  value={metrics.avgMatchScore > 0 ? `${metrics.avgMatchScore}%` : "—"} sub="across all versions"  color="teal"  tooltip="How closely your CV matches each job description on average. Decode a job and tailor your CV to get a score." />
         <MetricCard label="Interviews"       value={metrics.interviews}                                           sub="from applications"    color="amber" />
         <MetricCard label="CV versions"      value={metrics.cvVersions}                                           sub="tailored versions"    color="coral" />
       </div>
